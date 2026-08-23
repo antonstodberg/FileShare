@@ -34,7 +34,8 @@ public class ClientHandler extends Thread {
     public void run() {
         try {
             String input;
-            while ((input = reader.readLine()) != null) {
+            boolean running = true;
+            while ((running && (input = reader.readLine()) != null)) {
                 String[] inputArray = input.split(" ");
                 UserCommands command = UserCommands.valueOf(inputArray[0].toLowerCase());
                 switch (command) {
@@ -43,11 +44,11 @@ public class ClientHandler extends Thread {
                             writer.println(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
-                        if (input.length < 3){
+                        if (inputArray.length < 3){
                             writer.println(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
-                        user = server.login(input[1], input[2]);
+                        user = server.login(inputArray[1], inputArray[2]);
                         if (user == null) {
                             writer.println(ServerResponse.LOGIN_FAILED);
                         } else {
@@ -56,11 +57,11 @@ public class ClientHandler extends Thread {
                         break;
 
                     case REGISTER:
-                        if (input.length < 4) {
+                        if (inputArray.length < 4) {
                             writer.println(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
-                        user = server.register(input[1], input[2], input[3]);
+                        user = server.register(inputArray[1], inputArray[2], inputArray[3]);
 
                         if (user == null) {
                             writer.println(ServerResponse.REGISTER_FAILED);
@@ -82,11 +83,11 @@ public class ClientHandler extends Thread {
                             writer.println(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (input.length < 2) {
+                        if (inputArray.length < 2) {
                             writer.println(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
-                        server.uploadFile(user, input[1]);
+                        server.uploadFile(user, inputArray[1]);
                         break;
 
                     case DOWNLOAD:
@@ -94,11 +95,11 @@ public class ClientHandler extends Thread {
                             writer.println(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (input.length < 2) {
+                        if (inputArray.length < 2) {
                             writer.println(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
-                        server.downloadFile(user, input[1]);
+                        server.downloadFile(user, inputArray[1]);
                         break;
 
                     case SHARE:
@@ -106,11 +107,23 @@ public class ClientHandler extends Thread {
                             writer.println(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (input.length < 3) {
+                        if (inputArray.length < 3) {
                             writer.println(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
-                        server.shareFile(user, input[1], input[2]);
+                        server.shareFile(user, inputArray[1], inputArray[2]);
+                        break;
+
+                    case LOGOUT:
+                        user = null;
+                        writer.println(ServerResponse.LOGOUT);
+                        break;
+
+                    case EXIT:
+                        writer.close();
+                        try { reader.close(); } catch (IOException ignored) { }
+                        server.removeClient(this);
+                        running = false;
                         break;
 
                     default:
@@ -119,6 +132,7 @@ public class ClientHandler extends Thread {
                 }
             }
         } catch (IOException e) {
+            System.out.println(e.getMessage());
         } finally {
             writer.close();
             try { reader.close(); } catch (IOException ignored) { }

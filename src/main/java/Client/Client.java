@@ -48,7 +48,7 @@ public class Client {
 
     public void printConnectionInfo() {
         System.out.println(
-                "\n*****************************\n" +
+                        "\n*****************************\n" +
                         "Connection established. \n" +
                         "Host: " + socket.getInetAddress().getHostName() + '\n' +
                         "Port: " + socket.getPort() + '\n' +
