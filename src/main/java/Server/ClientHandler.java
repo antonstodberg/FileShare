@@ -1,0 +1,128 @@
+package Server;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import Client.UserCommands;
+
+public class ClientHandler extends Thread {
+    // could implement Runnable?
+    private final Server server;
+    private Socket socket;
+    private BufferedReader reader;
+    private PrintWriter writer;
+
+    private User user;
+
+    public ClientHandler(Socket socket, Server server) {
+        this.socket = socket;
+        this.server = server;
+
+        try {
+            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            writer = new PrintWriter(socket.getOutputStream(), true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Socket getSocket() { return socket; }
+
+    @Override
+    public void run() {
+        try {
+            String input;
+            while ((input = reader.readLine()) != null) {
+                String[] inputArray = input.split(" ");
+                UserCommands command = UserCommands.valueOf(inputArray[0].toLowerCase());
+                switch (command) {
+                    case LOGIN:
+                        if (user != null) {
+                            writer.println(ServerResponse.ALREADY_LOGGED_IN);
+                            break;
+                        }
+                        if (input.length < 3){
+                            writer.println(ServerResponse.ARGUMENT_MISMATCH);
+                            break;
+                        }
+                        user = server.login(input[1], input[2]);
+                        if (user == null) {
+                            writer.println(ServerResponse.LOGIN_FAILED);
+                        } else {
+                            writer.println(ServerResponse.LOGIN_SUCCESS);
+                        }
+                        break;
+
+                    case REGISTER:
+                        if (input.length < 4) {
+                            writer.println(ServerResponse.ARGUMENT_MISMATCH);
+                            break;
+                        }
+                        user = server.register(input[1], input[2], input[3]);
+
+                        if (user == null) {
+                            writer.println(ServerResponse.REGISTER_FAILED);
+                        } else {
+                            writer.println(ServerResponse.REGISTER_SUCCESS);
+                        }
+                        break;
+
+                    case LIST:
+                        if (user == null) {
+                            writer.println(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        writer.println(server.listFiles(user));
+                        break;
+
+                    case UPLOAD:
+                        if (user == null) {
+                            writer.println(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        if (input.length < 2) {
+                            writer.println(ServerResponse.ARGUMENT_MISMATCH);
+                            break;
+                        }
+                        server.uploadFile(user, input[1]);
+                        break;
+
+                    case DOWNLOAD:
+                        if (user == null) {
+                            writer.println(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        if (input.length < 2) {
+                            writer.println(ServerResponse.ARGUMENT_MISMATCH);
+                            break;
+                        }
+                        server.downloadFile(user, input[1]);
+                        break;
+
+                    case SHARE:
+                        if (user == null) {
+                            writer.println(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        if (input.length < 3) {
+                            writer.println(ServerResponse.ARGUMENT_MISMATCH);
+                            break;
+                        }
+                        server.shareFile(user, input[1], input[2]);
+                        break;
+
+                    default:
+                        writer.println(ServerResponse.UNRECOGNIZED_COMMAND);
+                        break;
+                }
+            }
+        } catch (IOException e) {
+        } finally {
+            writer.close();
+            try { reader.close(); } catch (IOException ignored) { }
+            server.removeClient(this);
+        }
+    }
+}
