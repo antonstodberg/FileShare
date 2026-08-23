@@ -13,19 +13,21 @@ import java.util.Scanner;
 public class Client {
     private final static String DEFAULT_HOST = "127.0.0.1";
     private final static int DEFAULT_PORT = 2000;
+
     private final static String WELCOME_MESSAGE = "FILESHARE\n"
-            + UserCommands.LOGIN + " <username> <password> -> log in to already registered user\n"
-            + UserCommands.REGISTER + " <username> <email> <password> -> register new user and log in";
+            + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
+            + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
+
     private final static String ENTER_COMMAND = "Enter command:\n"
-            + UserCommands.LIST + " -> list all files on server owned or shared with you\n"
-            + UserCommands.UPLOAD + " <filepath> -> upload a local file to the server\n"
-            + UserCommands.DOWNLOAD + " <filename> -> download file from server to computer\n"
-            + UserCommands.SHARE + " <filename> <username> -> share file from your account to the specified user\n"
-            + UserCommands.LOGOUT + " -> log out current user\n"
-            + UserCommands.EXIT + " -> close program";
+            + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
+            + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
+            + UserCommands.DOWNLOAD.getCommand() + " <filename> -> download file from server to computer\n"
+            + UserCommands.SHARE.getCommand() + " <filename> <username> -> share file from your account to the specified user\n"
+            + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
+            + UserCommands.EXIT.getCommand() + " -> close program";
 
     private Socket socket = new Socket();
-    private Scanner scanner;
+    private Scanner scanner = new Scanner(System.in);
     private PrintWriter writer;
     private BufferedReader reader;
 
@@ -40,13 +42,15 @@ public class Client {
     public Client(String host, int port) {
         try {
            socket.connect(new InetSocketAddress(host, port), 5000);
+           reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+           writer = new PrintWriter(socket.getOutputStream(), true);
         } catch (IOException e) {
             System.err.println(e.getMessage());
             System.exit(1);
         }
     }
 
-    public void printConnectionInfo() {
+    private void printConnectionInfo() {
         System.out.println(
                         "\n*****************************\n" +
                         "Connection established. \n" +
@@ -61,21 +65,51 @@ public class Client {
             System.out.println(WELCOME_MESSAGE);
             System.out.print("> ");
             String command = scanner.nextLine();
-
+            System.out.println("Sending: " + command);
             writer.println(command);
+            try {
+                System.out.println("Waiting for response...");
+                String response = reader.readLine();
+                System.out.println(response);
 
-            String response = reader.readLine();
-            System.out.println(response);
+                if (response.equals(ServerResponse.LOGIN_SUCCESS.getResponse())
+                    || response.equals(ServerResponse.REGISTER_SUCCESS.getResponse())) { break; }
 
-            if (response.equals(ServerResponse.LOGIN_SUCCESS.getResponse())
-                    || response.equals(ServerResponse.REGISTER_SUCCESS.getResponse())) {
-                break;
+            } catch (IOException e) {
+                System.err.println(e.getMessage());
+                shutdownClient();
             }
         }
     }
 
     private void commandLoop() {
-        System.out.println(ENTER_COMMAND);
+        while (true) {
+            System.out.println(ENTER_COMMAND);
+            String command = scanner.nextLine();
+            writer.println(command);
+            try {
+                String response = reader.readLine();
+                System.out.println(response);
+                if (response.equals(ServerResponse.EXIT.getResponse())) { shutdownClient(); }
+                if (response.equals(ServerResponse.LOGOUT.getResponse())) { return; }
+            } catch (IOException e) {
+                System.err.println(e.getMessage());
+                shutdownClient();
+            }
+        }
+    }
+
+    private void shutdownClient() {
+        scanner.close();
+        writer.close();
+        try {
+            reader.close();
+            socket.close();
+        } catch (IOException ignored) {
+
+        } finally {
+            System.exit(1);
+        }
     }
 
     static void main(String[] args) {
@@ -86,10 +120,9 @@ public class Client {
         };
         client.printConnectionInfo();
 
-        client.loginLoop();
-
-        client.commandLoop();
-
-        System.out.println(ENTER_COMMAND);
+        while (true) {
+            client.loginLoop();
+            client.commandLoop();
+        }
     }
 }

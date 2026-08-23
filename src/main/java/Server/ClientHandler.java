@@ -35,9 +35,16 @@ public class ClientHandler extends Thread {
         try {
             String input;
             boolean running = true;
+            System.out.println("ready");
             while ((running && (input = reader.readLine()) != null)) {
-                String[] inputArray = input.split(" ");
-                UserCommands command = UserCommands.valueOf(inputArray[0].toLowerCase());
+                System.out.println("Received: " + input);
+                String[] inputArray = input.trim().split("\\s+");
+                UserCommands command = UserCommands.fromCommand(inputArray[0]);
+                if (command == null) {
+                    writer.println(ServerResponse.UNRECOGNIZED_COMMAND);
+                    continue;
+                }
+
                 switch (command) {
                     case LOGIN:
                         if (user != null) {
@@ -120,14 +127,8 @@ public class ClientHandler extends Thread {
                         break;
 
                     case EXIT:
-                        writer.close();
-                        try { reader.close(); } catch (IOException ignored) { }
-                        server.removeClient(this);
+                        writer.println(ServerResponse.EXIT);
                         running = false;
-                        break;
-
-                    default:
-                        writer.println(ServerResponse.UNRECOGNIZED_COMMAND);
                         break;
                 }
             }

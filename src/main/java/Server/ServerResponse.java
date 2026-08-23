@@ -14,7 +14,8 @@ public enum ServerResponse {
     ARGUMENT_MISMATCH("Incorrect number of arguments."),
 
     // General
-    UNRECOGNIZED_COMMAND("Not a valid command.");
+    UNRECOGNIZED_COMMAND("Not a valid command."),
+    EXIT("exit");
 
     private final String response;
 
