@@ -18,7 +18,7 @@ public class Client {
             + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
             + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
 
-    private final static String ENTER_COMMAND = "Enter command:\n"
+    private final static String ENTER_COMMAND = "\nEnter command:\n"
             + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
             + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
             + UserCommands.DOWNLOAD.getCommand() + " <filename> -> download file from server to computer\n"
@@ -72,8 +72,9 @@ public class Client {
                     System.err.println("Lost connection to server");
                     shutdownClient();
                 }
-
                 System.out.println(response);
+
+                if (response.equals(ServerResponse.EXIT.getResponse())) shutdownClient();
 
                 if (response.equals(ServerResponse.LOGIN_SUCCESS.getResponse())
                     || response.equals(ServerResponse.REGISTER_SUCCESS.getResponse())) { break; }
@@ -87,7 +88,9 @@ public class Client {
 
     private void commandLoop() {
         while (true) {
+            System.out.println("ENTERED COMMAND LOOP");
             System.out.println(ENTER_COMMAND);
+            System.out.print("> ");
             String command = scanner.nextLine();
             writer.println(command);
             try {

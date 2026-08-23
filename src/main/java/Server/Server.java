@@ -6,16 +6,19 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.security.crypto.bcrypt.BCrypt;
 
 public class Server {
     private final static int DEFAULT_PORT = 2000;
     private ServerSocket socket;
     private List<ClientHandler> clients = new ArrayList<>();
+    private Database database = new Database();
 
     public Server() { this(DEFAULT_PORT); }
     public Server(int port) {
         try {
             socket = new ServerSocket(port);
+
         } catch (IOException e) {
             System.err.println(e.getMessage());
             System.exit(1);
@@ -88,10 +91,16 @@ public class Server {
     }
 
     public User register(String username, String email, String password) {
-        return null;
+        String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+        return database.register(username, email, passwordHash);
     }
 
     public User login(String username, String password) {
+        User stored_user = database.getUser(username);
+        if (stored_user == null) return null;
+        if (BCrypt.checkpw(password, stored_user.getPasswordHash())) {
+            return stored_user;
+        }
         return null;
     }
 
