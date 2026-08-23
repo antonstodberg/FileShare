@@ -120,6 +120,11 @@ public class ClientHandler extends Thread {
                         break;
 
                     case LOGOUT:
+                        if (user == null) {
+                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            break;
+                        }
+
                         user = null;
                         writer.println(ServerResponse.LOGOUT.getResponse());
                         break;
