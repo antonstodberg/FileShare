@@ -14,7 +14,7 @@ public class Client {
     private final static String DEFAULT_HOST = "127.0.0.1";
     private final static int DEFAULT_PORT = 2000;
 
-    private final static String WELCOME_MESSAGE = "FILESHARE\n"
+    private final static String WELCOME_MESSAGE = "\nFILESHARE\n"
             + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
             + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
 
@@ -56,7 +56,7 @@ public class Client {
                         "Connection established. \n" +
                         "Host: " + socket.getInetAddress().getHostName() + '\n' +
                         "Port: " + socket.getPort() + '\n' +
-                        "*****************************\n"
+                        "*****************************"
         );
     }
 
@@ -65,11 +65,14 @@ public class Client {
             System.out.println(WELCOME_MESSAGE);
             System.out.print("> ");
             String command = scanner.nextLine();
-            System.out.println("Sending: " + command);
             writer.println(command);
             try {
-                System.out.println("Waiting for response...");
                 String response = reader.readLine();
+                if (response == null) {
+                    System.err.println("Lost connection to server");
+                    shutdownClient();
+                }
+
                 System.out.println(response);
 
                 if (response.equals(ServerResponse.LOGIN_SUCCESS.getResponse())
@@ -89,6 +92,7 @@ public class Client {
             writer.println(command);
             try {
                 String response = reader.readLine();
+                if (response == null) shutdownClient();
                 System.out.println(response);
                 if (response.equals(ServerResponse.EXIT.getResponse())) { shutdownClient(); }
                 if (response.equals(ServerResponse.LOGOUT.getResponse())) { return; }
