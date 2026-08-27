@@ -1,5 +1,10 @@
 generellt:
 - se över om enums används på rätt sätt, ska jag jämföra enums med enums eller textrepresentationen
+- behöver jag kolla över att användare inte har lagt in saker som kan störa sql eller liknande
+
+Database.java
+- should add file return FileRecord instead?
+- look through if all should throw a la getFilesByUser()
 
 
 - nästa: se överdatabas, förbereda för filförvaring och ägarskap
