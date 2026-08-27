@@ -88,7 +88,6 @@ public class Client {
 
     private void commandLoop() {
         while (true) {
-            System.out.println("ENTERED COMMAND LOOP");
             System.out.println(ENTER_COMMAND);
             System.out.print("> ");
             String command = scanner.nextLine();

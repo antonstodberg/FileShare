@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.sql.SQLException;
+
 import Client.UserCommands;
 
 public class ClientHandler extends Thread {
@@ -137,6 +139,8 @@ public class ClientHandler extends Thread {
             }
         } catch (IOException e) {
             System.out.println(e.getMessage());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         } finally {
             writer.close();
             try { reader.close(); } catch (IOException ignored) { }

@@ -2,7 +2,6 @@ package Server;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class Database {
@@ -32,9 +31,10 @@ public class Database {
      * @param email the email address of the new user.
      * @param passwordHash the hashed password of the new user.
      * @return a User object containing the newly created user's information,
-     *         or null if the user could not be registered.
+     *         or null if no generated ID was returned.
+     * @throws SQLException if the user could not be registered.
      */
-    public User register(String username, String email, String passwordHash) {
+    public User register(String username, String email, String passwordHash) throws SQLException {
         String sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
         try (PreparedStatement ps = dbConnection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, username);
@@ -49,9 +49,6 @@ public class Database {
                 }
             }
             return null;
-        } catch (SQLException e) {
-            System.err.println(e.getMessage());
-            return null;
         }
     }
 
@@ -59,10 +56,10 @@ public class Database {
      * Retrieves a user from the database by username.
      *
      * @param username the username to search for.
-     * @return the corresponding User object, or null if no user was found
-     *         or the database query failed.
+     * @return the corresponding User object, or null if no user was found.
+     * @throws SQLException if the database query fails.
      */
-    public User getUser(String username) {
+    public User getUser(String username) throws SQLException {
         String sql = "SELECT * FROM users WHERE username = ?";
         try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
             ps.setString(1, username);
@@ -78,9 +75,6 @@ public class Database {
             }
 
             return null;
-        } catch (SQLException e) {
-            System.err.println(e.getMessage());
-            return null;
         }
     }
 
@@ -91,10 +85,11 @@ public class Database {
      * @param size the size of the file in bytes.
      * @param ownerId the ID of the user who owns the file.
      * @return the ID assigned to the file if it was successfully added,
-     *         or -1 if the file could not be added.
+     *         or -1 if no generated ID was returned.
+     * @throws SQLException if the file could not be added.
      */
-    public long addFile(String fileName, long size, int ownerId) {
-        String sql = "INSERT INTO files (fileName, size, owner_id) VALUES(?, ?, ?)";
+    public long addFile(String fileName, long size, int ownerId) throws SQLException {
+        String sql = "INSERT INTO files (file_name, size, owner_id) VALUES(?, ?, ?)";
         try (PreparedStatement ps = dbConnection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, fileName);
@@ -109,9 +104,20 @@ public class Database {
             }
 
             return -1;
-        } catch (SQLException e) {
-            System.err.println(e.getMessage());
-            return -1;
+        }
+    }
+
+    /**
+     * Deletes a file from the database.
+     *
+     * @param fileId the ID of the file to delete.
+     * @throws SQLException if the deletion fails.
+     */
+    public void deleteFile(long fileId) throws SQLException {
+        String sql = "DELETE FROM files WHERE id = ?";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setLong(1, fileId);
+            ps.executeUpdate();
         }
     }
 
@@ -120,9 +126,10 @@ public class Database {
      *
      * @param id the ID of the file to retrieve.
      * @return a FileRecord containing the file's metadata, or null if no file
-     *         with the specified ID was found or the query failed.
+     *         with the specified ID was found.
+     * @throws SQLException if the database query fails.
      */
-    public FileRecord getFile(long id) {
+    public FileRecord getFile(long id) throws SQLException {
         String sql = "SELECT * FROM files WHERE id = ?";
         try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
             ps.setLong(1, id);
@@ -139,9 +146,6 @@ public class Database {
 
                 return null;
             }
-        } catch (SQLException e) {
-            System.err.println(e.getMessage());
-            return null;
         }
     }
 
@@ -174,6 +178,68 @@ public class Database {
 
                 return fileList;
             }
+        }
+    }
+
+    /**
+     * Retrieves all files shared with a user.
+     *
+     * @param userId the ID of the user.
+     * @return a list containing the files shared with the user, or an empty list
+     *         if no files have been shared with the user.
+     * @throws SQLException if the database query fails.
+     */
+    public List<FileRecord> getSharedFiles(int userId) throws SQLException {
+        String sql = "SELECT * FROM files JOIN file_shares ON files.id = file_shares.file_id WHERE user_id = ?";
+
+        List<FileRecord> files = new ArrayList<>();
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    files.add(new FileRecord(
+                            rs.getLong("id"),
+                            rs.getString("file_name"),
+                            rs.getLong("size"),
+                            rs.getInt("owner_id"),
+                            rs.getTimestamp("uploaded_at").toLocalDateTime()
+                    ));
+                }
+            }
+        }
+
+        return files;
+    }
+
+    /**
+     * Shares a file with a user.
+     *
+     * @param fileId the ID of the file to share.
+     * @param userId the ID of the user receiving access.
+     * @throws SQLException if query failed.
+     */
+    public void shareFileToUser(long fileId, int userId) throws SQLException {
+        String sql = "INSERT INTO file_shares (file_id, user_id) VALUES(?, ?)";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setLong(1, fileId);
+            ps.setInt(2, userId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Removes a user's access to a shared file.
+     *
+     * @param fileId the ID of the file.
+     * @param userId the ID of the user whose access should be removed.
+     * @throws SQLException if the deletion fails.
+     */
+    public void removeSharedAccessToFile(long fileId, int userId) throws SQLException {
+        String sql = "DELETE FROM file_shares WHERE file_id = ? AND user_id = ?";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setLong(1, fileId);
+            ps.setInt(2, userId);
+            ps.executeUpdate();
         }
     }
 }
