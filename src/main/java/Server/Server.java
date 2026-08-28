@@ -1,10 +1,13 @@
 package Server;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -142,8 +145,22 @@ public class Server {
         return sb.toString();
     }
 
-    public void uploadFile(User user, String filepath){
+    public boolean uploadFile(String fileName,
+                           long fileSize,
+                           int ownerId,
+                           InputStream inputStream) throws IOException, SQLException {
 
+        long fileId = database.addFile(fileName, fileSize, ownerId);
+
+        try {
+            FileStorage.save(fileId, inputStream, fileSize);
+            return true;
+
+        } catch (IOException e) {
+            database.deleteFile(fileId);
+            if (FileStorage.exists(fileId)) FileStorage.delete(fileId);
+            return false;
+        }
     }
 
     public void downloadFile(User user, String filename) {

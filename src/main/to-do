@@ -3,6 +3,11 @@ generellt:
 - behöver jag kolla över att användare inte har lagt in saker som kan störa sql eller liknande
 - testa alla "endpoints"
 
+Client.java
+- add show current user / alltid visa current user
+- add status update when long time like upload/download
+- dont show size as bytes, maybe gb/mb/kb
+
 Database.java
 - should add file return FileRecord instead?
 - look through if all should throw a la getFilesByUser()

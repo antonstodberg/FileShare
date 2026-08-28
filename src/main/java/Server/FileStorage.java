@@ -1,8 +1,6 @@
 package Server;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -26,14 +24,29 @@ public class FileStorage {
      * Saves file data using the file ID as the filename.
      *
      * @param fileId the ID of the file.
-     * @param bytes the file data to save.
+     * @param inputStream the file data to save.
+     * @param fileSize size of data in bytes
      * @throws IOException if the file could not be saved.
      */
-    public static void save(long fileId, byte[] bytes) throws IOException {
-
+    public static void save(long fileId, InputStream inputStream, long fileSize) throws IOException {
         Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));
-        try (FileOutputStream fileOut = new FileOutputStream(filePath.toFile())) {
-            fileOut.write(bytes);
+
+        try (OutputStream output = new FileOutputStream(filePath.toFile())) {
+
+            byte[] buffer = new byte[64 * 1024];
+            long remaining = fileSize;
+
+            while (remaining > 0) {
+                int bytesToRead = (int) Math.min(buffer.length, remaining);
+                int bytesRead = inputStream.read(buffer, 0, bytesToRead);
+
+                if (bytesRead == -1) {
+                    throw new EOFException("Connection ended before file was completely received");
+                }
+
+                output.write(buffer, 0, bytesRead);
+                remaining -= bytesRead;
+            }
         }
     }
 

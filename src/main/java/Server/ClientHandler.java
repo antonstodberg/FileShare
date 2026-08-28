@@ -1,20 +1,21 @@
 package Server;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 
 import Client.UserCommands;
 
 public class ClientHandler extends Thread {
+
+    public static final String INTERNAL_ARGUMENT_MISMATCH =
+            "Arguments or params not correct with internal method implementation";
+
     // could implement Runnable?
     private final Server server;
     private Socket socket;
-    private BufferedReader reader;
-    private PrintWriter writer;
+    private DataOutputStream outputStream;
+    private DataInputStream inputStream;
 
     private User user;
 
@@ -23,8 +24,8 @@ public class ClientHandler extends Thread {
         this.server = server;
 
         try {
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            writer = new PrintWriter(socket.getOutputStream(), true);
+            outputStream = new DataOutputStream(socket.getOutputStream());
+            inputStream = new DataInputStream(socket.getInputStream());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -37,73 +38,71 @@ public class ClientHandler extends Thread {
         try {
             String input;
             boolean running = true;
-            while ((running && (input = reader.readLine()) != null)) {
+            while (running) {
+                input = inputStream.readUTF();
                 String[] inputArray = input.trim().split("\\s+");
                 UserCommands command = UserCommands.fromCommand(inputArray[0]);
                 if (command == null) {
-                    writer.println(ServerResponse.UNRECOGNIZED_COMMAND.getResponse());
+                    printStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
                     continue;
                 }
 
                 switch (command) {
                     case LOGIN:
                         if (user != null) {
-                            writer.println(ServerResponse.ALREADY_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
-                        if (inputArray.length < 3){
-                            writer.println(ServerResponse.ARGUMENT_MISMATCH.getResponse());
+                        if (inputArray.length < 3) {
+                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
                         user = server.login(inputArray[1], inputArray[2]);
                         if (user == null) {
-                            writer.println(ServerResponse.LOGIN_FAILED.getResponse());
+                            printStringToClient(ServerResponse.LOGIN_FAILED);
                         } else {
-                            writer.println(ServerResponse.LOGIN_SUCCESS.getResponse());
+                            printStringToClient(ServerResponse.LOGIN_SUCCESS);
                         }
                         break;
 
                     case REGISTER:
                         if (inputArray.length < 4) {
-                            writer.println(ServerResponse.ARGUMENT_MISMATCH.getResponse());
+                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
                         user = server.register(inputArray[1], inputArray[2], inputArray[3]);
 
                         if (user == null) {
-                            writer.println(ServerResponse.REGISTER_FAILED.getResponse());
+                            printStringToClient(ServerResponse.REGISTER_FAILED);
                         } else {
-                            writer.println(ServerResponse.REGISTER_SUCCESS.getResponse());
+                            printStringToClient(ServerResponse.REGISTER_SUCCESS);
                         }
                         break;
 
                     case LIST:
                         if (user == null) {
-                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        writer.println(server.listFiles(user));
+                        printStringToClient(server.listFiles(user));
                         break;
 
                     case UPLOAD:
                         if (user == null) {
-                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (inputArray.length < 2) {
-                            writer.println(ServerResponse.ARGUMENT_MISMATCH.getResponse());
-                            break;
-                        }
-                        server.uploadFile(user, inputArray[1]);
+
+                        uploadFile(inputArray);
                         break;
 
                     case DOWNLOAD:
                         if (user == null) {
-                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
                         if (inputArray.length < 2) {
-                            writer.println(ServerResponse.ARGUMENT_MISMATCH.getResponse());
+                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
                         server.downloadFile(user, inputArray[1]);
@@ -111,11 +110,11 @@ public class ClientHandler extends Thread {
 
                     case SHARE:
                         if (user == null) {
-                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
                         if (inputArray.length < 3) {
-                            writer.println(ServerResponse.ARGUMENT_MISMATCH.getResponse());
+                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
                             break;
                         }
                         server.shareFile(user, inputArray[1], inputArray[2]);
@@ -123,28 +122,60 @@ public class ClientHandler extends Thread {
 
                     case LOGOUT:
                         if (user == null) {
-                            writer.println(ServerResponse.USER_NOT_LOGGED_IN.getResponse());
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
 
                         user = null;
-                        writer.println(ServerResponse.LOGOUT.getResponse());
+                        printStringToClient(ServerResponse.LOGOUT);
                         break;
 
                     case EXIT:
-                        writer.println(ServerResponse.EXIT.getResponse());
+                        printStringToClient(ServerResponse.EXIT);
                         running = false;
                         break;
                 }
             }
         } catch (IOException e) {
-            System.out.println(e.getMessage());
+            System.err.println(e.getMessage());
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {
-            writer.close();
-            try { reader.close(); } catch (IOException ignored) { }
+            try {
+                inputStream.close();
+                outputStream.close();
+            } catch (IOException ignored) { }
+
             server.removeClient(this);
+        }
+    }
+
+    private void printStringToClient(String s) throws IOException {
+        outputStream.writeUTF(s);
+        outputStream.flush();
+    }
+
+    private void uploadFile(String[] inputArray) throws IOException {
+        if (inputArray.length < 3) {
+            System.err.println(INTERNAL_ARGUMENT_MISMATCH);
+            printStringToClient(ServerResponse.UPLOAD_FAILED);
+            return;
+        }
+
+        try {
+            long fileSize = Long.parseLong(inputArray[2]);
+            String fileName = inputArray[1];
+
+            boolean success = server.uploadFile(fileName, fileSize, user.getId(), inputStream);
+
+            printStringToClient(success ? ServerResponse.UPLOAD_SUCCESS : ServerResponse.UPLOAD_FAILED);
+
+        } catch (NumberFormatException e) {
+            System.err.println(INTERNAL_ARGUMENT_MISMATCH + "\n ClientHandler.uploadFile(String[] inputArray) inputArray[2] -> expected long fileSize but received something else");
+            printStringToClient(ServerResponse.UPLOAD_FAILED);
+        } catch (SQLException e) {
+            System.err.println(e.getMessage());
+            printStringToClient(ServerResponse.UPLOAD_FAILED);
         }
     }
 
