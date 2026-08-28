@@ -2,23 +2,22 @@ package Client;
 
 import Server.ServerResponse;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 public class Client {
     private final static String DEFAULT_HOST = "127.0.0.1";
     private final static int DEFAULT_PORT = 2000;
 
-    private final static String WELCOME_MESSAGE = "\nFILESHARE\n"
+    private final static String C_WELCOME_MESSAGE = "\nFILESHARE\n"
             + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
             + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
 
-    private final static String ENTER_COMMAND = "\nEnter command:\n"
+    private final static String C_ENTER_COMMAND = "\nEnter command:\n"
             + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
             + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
             + UserCommands.DOWNLOAD.getCommand() + " <filename> -> download file from server to computer\n"
@@ -26,10 +25,14 @@ public class Client {
             + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
             + UserCommands.EXIT.getCommand() + " -> close program";
 
-    private Socket socket = new Socket();
-    private Scanner scanner = new Scanner(System.in);
-    private PrintWriter writer;
-    private BufferedReader reader;
+    private final static String C_CONTINUE_LOOP = "Press enter to continue";
+    private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
+    private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
+
+    private final Socket socket = new Socket();
+    private final Scanner scanner = new Scanner(System.in);
+    private DataOutputStream outputStream;
+    private DataInputStream inputStream;
 
     public Client() {
         this(DEFAULT_HOST, DEFAULT_PORT);
@@ -41,9 +44,9 @@ public class Client {
 
     public Client(String host, int port) {
         try {
-           socket.connect(new InetSocketAddress(host, port), 5000);
-           reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-           writer = new PrintWriter(socket.getOutputStream(), true);
+            socket.connect(new InetSocketAddress(host, port), 5000);
+            outputStream = new DataOutputStream(socket.getOutputStream());
+            inputStream = new DataInputStream(socket.getInputStream());
         } catch (IOException e) {
             System.err.println(e.getMessage());
             System.exit(1);
@@ -60,24 +63,30 @@ public class Client {
         );
     }
 
+    private String readResponse() throws IOException {
+        try {
+            return inputStream.readUTF();
+        } catch (EOFException e) {
+            System.err.println(M_SERVER_LOST_CONNECTION);
+            shutdownClient();
+        }
+        return null;
+    }
+
     private void loginLoop() {
         while (true) {
-            System.out.println(WELCOME_MESSAGE);
+            System.out.println(C_WELCOME_MESSAGE);
             System.out.print("> ");
             String command = scanner.nextLine();
-            writer.println(command);
             try {
-                String response = reader.readLine();
-                if (response == null) {
-                    System.err.println("Lost connection to server");
-                    shutdownClient();
-                }
+                outputStream.writeUTF(command);
+                String response = readResponse();
                 System.out.println(response);
 
-                if (response.equals(ServerResponse.EXIT.getResponse())) shutdownClient();
+                if (response.equals(ServerResponse.EXIT)) shutdownClient();
 
-                if (response.equals(ServerResponse.LOGIN_SUCCESS.getResponse())
-                    || response.equals(ServerResponse.REGISTER_SUCCESS.getResponse())) { break; }
+                if (response.equals(ServerResponse.LOGIN_SUCCESS)
+                    || response.equals(ServerResponse.REGISTER_SUCCESS)) break;
 
             } catch (IOException e) {
                 System.err.println(e.getMessage());
@@ -88,17 +97,40 @@ public class Client {
 
     private void commandLoop() {
         while (true) {
-            System.out.println("ENTERED COMMAND LOOP");
-            System.out.println(ENTER_COMMAND);
-            System.out.print("> ");
-            String command = scanner.nextLine();
-            writer.println(command);
             try {
-                String response = reader.readLine();
-                if (response == null) shutdownClient();
+                System.out.println(C_ENTER_COMMAND);
+                System.out.print("> ");
+
+                String command = scanner.nextLine();
+                String[] inputArray = command.trim().split("\\s+");
+                UserCommands commandType = UserCommands.fromCommand(inputArray[0]);
+
+                String response = switch (commandType) {
+                    case UPLOAD -> uploadFile(inputArray);
+
+                    default -> {
+                        outputStream.writeUTF(command);
+                        yield readResponse();
+                    }
+                };
+
+                if (response == null) {
+                    System.err.println(M_SERVER_LOST_CONNECTION);
+                    shutdownClient();
+                }
+
                 System.out.println(response);
-                if (response.equals(ServerResponse.EXIT.getResponse())) { shutdownClient(); }
-                if (response.equals(ServerResponse.LOGOUT.getResponse())) { return; }
+
+                if (response.equals(ServerResponse.EXIT)) {
+                    shutdownClient();
+                }
+
+                if (response.equals(ServerResponse.LOGOUT)) {
+                    return;
+                }
+
+                System.out.println(C_CONTINUE_LOOP);
+                scanner.nextLine();
             } catch (IOException e) {
                 System.err.println(e.getMessage());
                 shutdownClient();
@@ -106,11 +138,38 @@ public class Client {
         }
     }
 
+    private String uploadFile(String[] inputArray) throws IOException {
+
+        if (inputArray.length < 2) return ServerResponse.ARGUMENT_MISMATCH;
+
+        Path path = Path.of(inputArray[1]);
+
+        if (!Files.isRegularFile(path)) return M_FNF_OR_DOES_NOT_EXIST;
+
+        String filename = path.getFileName().toString();
+        long fileSize = Files.size(path);
+
+        outputStream.writeUTF(UserCommands.UPLOAD.getCommand() + " " + filename + " " + fileSize);
+
+        try (InputStream fileIn = Files.newInputStream(path)) {
+            byte[] buffer = new byte[64 * 1024];
+            int bytesRead;
+
+            while ((bytesRead = fileIn.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+
+            outputStream.flush();
+        }
+
+        return readResponse();
+    }
+
     private void shutdownClient() {
         scanner.close();
-        writer.close();
         try {
-            reader.close();
+            inputStream.close();
+            outputStream.close();
             socket.close();
         } catch (IOException ignored) {
 

@@ -1,9 +1,13 @@
 package Server;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -90,12 +94,12 @@ public class Server {
         printServerStatus();
     }
 
-    public User register(String username, String email, String password) {
+    public User register(String username, String email, String password) throws SQLException {
         String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
         return database.register(username, email, passwordHash);
     }
 
-    public User login(String username, String password) {
+    public User login(String username, String password) throws SQLException {
         User stored_user = database.getUser(username);
         if (stored_user == null) return null;
         if (BCrypt.checkpw(password, stored_user.getPasswordHash())) {
@@ -104,12 +108,59 @@ public class Server {
         return null;
     }
 
-    public String listFiles(User user) {
-        return "";
+    public String listFiles(User user) throws SQLException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your files\n");
+        sb.append(String.format("%-6s %-25s %-12s %-22s%n",
+                "ID", "NAME", "SIZE", "UPLOADED"));
+
+        sb.append(String.format("%-6s %-25s %-12s %-22s%n",
+                "------", "-------------------------", "------------", "----------------------"));
+
+        List<FileRecord> userFiles = database.getFilesByOwner(user.getId());
+        for (FileRecord file : userFiles) {
+            sb.append(String.format("%-6d %-25s %-12d %-22s%n",
+                    file.getId(),
+                    file.getFileName(),
+                    file.getSize(),
+                    file.getUploadedAt()));
+        }
+
+        sb.append("\nShared with you\n");
+        sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
+                "ID", "NAME", "SIZE", "UPLOADED", "OWNER"));
+        sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
+                "------", "-------------------------", "------------", "----------------------", "--------------------"));
+
+        List<FileRecord> sharedFiles = database.getSharedFiles(user.getId());
+        for (FileRecord file : sharedFiles) {
+            sb.append(String.format("%-6d %-25s %-12d %-22s %-20d%n",
+                    file.getId(),
+                    file.getFileName(),
+                    file.getSize(),
+                    file.getUploadedAt(),
+                    file.getOwnerId()));
+        }
+
+        return sb.toString();
     }
 
-    public void uploadFile(User user, String filepath){
+    public boolean uploadFile(String fileName,
+                           long fileSize,
+                           int ownerId,
+                           InputStream inputStream) throws IOException, SQLException {
 
+        long fileId = database.addFile(fileName, fileSize, ownerId);
+
+        try {
+            FileStorage.save(fileId, inputStream, fileSize);
+            return true;
+
+        } catch (IOException e) {
+            database.deleteFile(fileId);
+            if (FileStorage.exists(fileId)) FileStorage.delete(fileId);
+            return false;
+        }
     }
 
     public void downloadFile(User user, String filename) {
