@@ -26,5 +26,6 @@ public final class ServerResponse {
     public static final String DOWNLOAD_SUCCESS = "File successfully downloaded";
     public static final String DOWNLOAD_FAILED = "File could not download";
     public static final String ACCESS_DENIED = "Access denied.";
+    public static final String SHARE_SUCCESS = "File shared to other user";
     private ServerResponse() {  }
 }

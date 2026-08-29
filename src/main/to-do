@@ -14,6 +14,7 @@ Client.java
 - dont show size as bytes, maybe gb/mb/kb
 - Abit wierd it returns ServerResponse in some places
 - handle if file to download have same name as a file in download folder
+- add shared to in list
 
 Database.java
 - should add file return FileRecord instead?

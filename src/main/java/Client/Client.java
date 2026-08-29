@@ -116,6 +116,11 @@ public class Client {
                 String[] inputArray = command.trim().split("\\s+");
                 UserCommands commandType = UserCommands.fromCommand(inputArray[0]);
 
+                if (commandType == null) {
+                    System.err.println(ServerResponse.UNRECOGNIZED_COMMAND);
+                    continue;
+                }
+
                 String response = switch (commandType) {
                     case UPLOAD -> uploadFile(inputArray);
 
@@ -183,13 +188,13 @@ public class Client {
 
         outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
 
-        String response = inputStream.readUTF();
+        String response = readResponse();
 
         if (!response.equals(ServerResponse.DOWNLOAD_SUCCESS)) {
             return response;
         }
 
-        String fileName = inputStream.readUTF();
+        String fileName = readResponse();
         long fileSize = inputStream.readLong();
 
         try (OutputStream fileOut = new FileOutputStream(DOWNLOAD_PATH.resolve(fileName).toFile())) {

@@ -173,8 +173,20 @@ public class Server {
         }
     }
 
-    public void shareFile(User user, String filename, String username) {
+    public void shareFile(int ownerId, long fileId, String username) throws SQLException, IllegalAccessException {
 
+        if (!database.hasAccess(ownerId, fileId)) {
+            throw new IllegalAccessException("User does not have access to this file");
+        }
+
+        User userToShare = database.getUser(username);
+
+        if (userToShare == null) {
+            System.out.println("U S ER does not xist dawg");
+            throw new IllegalArgumentException("user: " + username + "not found");
+        }
+
+        database.shareFileToUser(fileId, userToShare.getId());
     }
 
     static void main(String[] args) {
