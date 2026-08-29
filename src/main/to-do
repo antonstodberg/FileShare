@@ -3,6 +3,7 @@ generellt:
 - behöver jag kolla över att användare inte har lagt in saker som kan störa sql eller liknande
 - testa alla "endpoints"
 - should share be share <fileId> <email>
+- check if flush in more places
 
 Server.java
 - fix ip address etc when client disconnects
