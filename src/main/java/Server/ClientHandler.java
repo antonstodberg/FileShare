@@ -105,6 +105,14 @@ public class ClientHandler extends Thread {
                         downloadFile(inputArray);
                         break;
 
+                    case DELETE:
+                        if (user == null) {
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        delete(inputArray);
+                        break;
+
                     case SHARE:
                         if (user == null) {
                             printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
@@ -131,8 +139,10 @@ public class ClientHandler extends Thread {
             }
         } catch (IOException e) {
             System.err.println(e.getMessage());
+            printStringToClient(e.getMessage());
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            printStringToClient(e.getMessage());
+            throw new RuntimeException(e); // should this be done here?
         } finally {
             try {
                 inputStream.close();
@@ -143,9 +153,13 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void printStringToClient(String s) throws IOException {
-        outputStream.writeUTF(s);
-        outputStream.flush();
+    private void printStringToClient(String s) {
+        try {
+            outputStream.writeUTF(s);
+            outputStream.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e); // also should this be done
+        }
     }
 
     private void uploadFile(String[] inputArray) throws IOException {
@@ -206,8 +220,27 @@ public class ClientHandler extends Thread {
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
             printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
-        } catch (IllegalAccessException e) {
-            printStringToClient(ServerResponse.ACCESS_DENIED);
+        } catch (FileNotFoundException | IllegalAccessException e) {
+            printStringToClient(e.getMessage());
+        }
+    }
+
+    private void delete(String[] inputArray) throws SQLException, IOException {
+        if (inputArray.length < 2) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+
+        try {
+            long fileId = Long.parseLong(inputArray[1]);
+            server.deleteFile(user.getId(), fileId);
+            printStringToClient(ServerResponse.DELETE_SUCCESS);
+
+        } catch (NumberFormatException e) {
+            System.err.println(e.getMessage());
+            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+        } catch (FileNotFoundException | IllegalAccessException e) {
+            printStringToClient(e.getMessage());
         }
     }
 
@@ -217,15 +250,13 @@ public class ClientHandler extends Thread {
             return;
         }
         try {
-            Long fileId = Long.parseLong(inputArray[1]);
+            long fileId = Long.parseLong(inputArray[1]);
             server.shareFile(user.getId(), fileId, inputArray[2]);
             printStringToClient(ServerResponse.SHARE_SUCCESS);
-        } catch (IllegalAccessException e) {
-            printStringToClient(ServerResponse.ACCESS_DENIED);
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
             printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
-        } catch (IllegalArgumentException e) {
+        } catch (FileNotFoundException | IllegalAccessException | IllegalArgumentException e) {
             printStringToClient(e.getMessage());
         }
     }

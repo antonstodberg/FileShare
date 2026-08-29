@@ -3,12 +3,14 @@ package Client;
 public enum UserCommands {
     LOGIN("login"),
     REGISTER("register"),
-    LOGOUT("logout"),
-    EXIT("exit"),
     LIST("list"),
     UPLOAD("upload"),
     DOWNLOAD("download"),
-    SHARE("share");
+    DELETE("delete"),
+    SHARE("share"),
+    UNSHARE("unshare"),
+    LOGOUT("logout"),
+    EXIT("exit");
 
     private final String command;
 

@@ -21,7 +21,9 @@ public class Client {
             + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
             + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
             + UserCommands.DOWNLOAD.getCommand() + " <fileId> -> download file from server to computer\n"
+            + UserCommands.DELETE.getCommand() + " <fileId> -> delete file from server\n"
             + UserCommands.SHARE.getCommand() + " <fileId> <username> -> share file from your account to the specified user\n"
+            + UserCommands.UNSHARE.getCommand() + " <fileId> <username> -> remove that users access to file\n"
             + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
             + UserCommands.EXIT.getCommand() + " -> close program";
 
@@ -91,6 +93,7 @@ public class Client {
             String command = scanner.nextLine();
             try {
                 outputStream.writeUTF(command);
+                outputStream.flush();
                 String response = readResponse();
                 System.out.println(response);
 
@@ -128,6 +131,7 @@ public class Client {
 
                     default -> {
                         outputStream.writeUTF(command);
+                        outputStream.flush();
                         yield readResponse();
                     }
                 };
