@@ -17,6 +17,7 @@ Client.java
 - Abit wierd it returns ServerResponse in some places
 - handle if file to download have same name as a file in download folder
 - add shared to in list
+- otydligt att commands inte fungerar i enter läge
 
 Database.java
 - should add file return FileRecord instead?
