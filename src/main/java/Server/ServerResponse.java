@@ -25,7 +25,12 @@ public final class ServerResponse {
     public static final String UPLOAD_FAILED = "File could not upload";
     public static final String DOWNLOAD_SUCCESS = "File successfully downloaded";
     public static final String DOWNLOAD_FAILED = "File could not download";
-    public static final String ACCESS_DENIED = "Access denied.";
+    public static final String ACCESS_DENIED = "User does not have rights to perform this action";
     public static final String SHARE_SUCCESS = "File shared to other user";
+    public static final String USER_NOT_ACCESS_TO_FILE = "User does not have access to this file";
+    public static final String USER_NOT_OWN_FILE = "You are not the owner of this file";
+    public static final String FILE_DOES_NOT_EXIST = "File does not exist";
+    public static final String USER_ALREADY_ACCESS_FILE = "User already has access to this file";
+    public static final String DELETE_SUCCESS = "File was deleted";
     private ServerResponse() {  }
 }
