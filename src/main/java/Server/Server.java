@@ -217,6 +217,27 @@ public class Server {
         database.shareFileToUser(fileId, userToShare.getId());
     }
 
+    public void unshareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
+        FileRecord file = database.getFile(fileId);
+        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+
+        if (file.getOwnerId() != userId) {
+            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+        }
+
+        User userToUnshare = database.getUser(username);
+
+        if (userToUnshare == null) {
+            throw new IllegalArgumentException("user: " + username + "not found");
+        }
+
+        if (!database.hasAccess(userToUnshare.getId(), fileId)) {
+            throw new IllegalArgumentException(ServerResponse.USER_NOT_ACCESS_TO_FILE);
+        }
+
+        database.removeSharedAccessToFile(fileId, userToUnshare.getId());
+    }
+
     static void main(String[] args) {
         Server server;
         if (args.length > 0) {

@@ -32,5 +32,7 @@ public final class ServerResponse {
     public static final String FILE_DOES_NOT_EXIST = "File does not exist";
     public static final String USER_ALREADY_ACCESS_FILE = "User already has access to this file";
     public static final String DELETE_SUCCESS = "File was deleted";
+    public static final String UNSHARE_SUCCESS = "File no longer shared to other user";
+
     private ServerResponse() {  }
 }

@@ -121,6 +121,14 @@ public class ClientHandler extends Thread {
                         share(inputArray);
                         break;
 
+                    case UNSHARE:
+                        if (user == null) {
+                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            break;
+                        }
+                        unshare(inputArray);
+                        break;
+
                     case LOGOUT:
                         if (user == null) {
                             printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
@@ -260,4 +268,22 @@ public class ClientHandler extends Thread {
             printStringToClient(e.getMessage());
         }
     }
+
+    private void unshare(String[] inputArray) throws IOException, SQLException {
+        if (inputArray.length < 3) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+        try {
+            long fileId = Long.parseLong(inputArray[1]);
+            server.unshareFile(user.getId(), fileId, inputArray[2]);
+            printStringToClient(ServerResponse.UNSHARE_SUCCESS);
+        } catch (NumberFormatException e) {
+            System.err.println(e.getMessage());
+            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+        } catch (FileNotFoundException | IllegalAccessException | IllegalArgumentException e) {
+            printStringToClient(e.getMessage());
+        }
+    }
+
 }
