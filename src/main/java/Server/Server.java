@@ -10,6 +10,8 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 public class Server {
@@ -163,8 +165,12 @@ public class Server {
         }
     }
 
-    public void downloadFile(User user, String filename) {
-
+    public DownloadData downloadFile(int userId, long fileId) throws SQLException, IOException, IllegalAccessException {
+        if (database.hasAccess(userId, fileId)) {
+            return new DownloadData(FileStorage.read(fileId), database.getFile(fileId));
+        } else {
+            throw new IllegalAccessException("User does not have access to this file");
+        }
     }
 
     public void shareFile(User user, String filename, String username) {

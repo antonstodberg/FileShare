@@ -20,8 +20,8 @@ public class Client {
     private final static String C_ENTER_COMMAND = "\nEnter command:\n"
             + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
             + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
-            + UserCommands.DOWNLOAD.getCommand() + " <filename> -> download file from server to computer\n"
-            + UserCommands.SHARE.getCommand() + " <filename> <username> -> share file from your account to the specified user\n"
+            + UserCommands.DOWNLOAD.getCommand() + " <fileId> -> download file from server to computer\n"
+            + UserCommands.SHARE.getCommand() + " <fileId> <username> -> share file from your account to the specified user\n"
             + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
             + UserCommands.EXIT.getCommand() + " -> close program";
 
@@ -33,6 +33,17 @@ public class Client {
     private final Scanner scanner = new Scanner(System.in);
     private DataOutputStream outputStream;
     private DataInputStream inputStream;
+
+    private static final Path DOWNLOAD_PATH =
+            Path.of(System.getProperty("user.dir"), "Downloads");
+
+    static {
+        try {
+            Files.createDirectories(DOWNLOAD_PATH);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not create download directory", e);
+        }
+    }
 
     public Client() {
         this(DEFAULT_HOST, DEFAULT_PORT);
@@ -108,6 +119,8 @@ public class Client {
                 String response = switch (commandType) {
                     case UPLOAD -> uploadFile(inputArray);
 
+                    case DOWNLOAD -> downloadFile(inputArray);
+
                     default -> {
                         outputStream.writeUTF(command);
                         yield readResponse();
@@ -163,6 +176,40 @@ public class Client {
         }
 
         return readResponse();
+    }
+
+    private String downloadFile(String[] inputArray) throws IOException {
+        if (inputArray.length < 2) return ServerResponse.ARGUMENT_MISMATCH;
+
+        outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
+
+        String response = inputStream.readUTF();
+
+        if (!response.equals(ServerResponse.DOWNLOAD_SUCCESS)) {
+            return response;
+        }
+
+        String fileName = inputStream.readUTF();
+        long fileSize = inputStream.readLong();
+
+        try (OutputStream fileOut = new FileOutputStream(DOWNLOAD_PATH.resolve(fileName).toFile())) {
+            byte[] buffer = new byte[64 * 1024];
+            long remaining = fileSize;
+
+            while (remaining > 0) {
+                int bytesToRead = Math.min(buffer.length, (int)remaining);
+                int bytesRead = inputStream.read(buffer, 0, bytesToRead);
+                if (bytesRead == -1) throw new EOFException("Connection lost");
+
+                fileOut.write(buffer, 0, bytesRead);
+                remaining -= bytesRead;
+            }
+
+            return "File was downloaded to your FileShare/Downloads folder";
+
+        } catch (FileNotFoundException e) {
+            return M_FNF_OR_DOES_NOT_EXIST;
+        }
     }
 
     private void shutdownClient() {

@@ -3,6 +3,7 @@ package Server;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 
 /**
@@ -57,12 +58,10 @@ public class FileStorage {
      *  @return the stored file data.
      *  @throws IOException if the file could not be read.
      */
-    public static byte[] read(long fileId) throws IOException {
+    public static InputStream read(long fileId) throws IOException {
         Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));
 
-        try (FileInputStream fileIn = new FileInputStream(filePath.toFile())) {
-            return fileIn.readAllBytes();
-        }
+        return new FileInputStream(filePath.toFile());
     }
 
     /**
