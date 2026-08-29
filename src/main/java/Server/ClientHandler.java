@@ -110,11 +110,7 @@ public class ClientHandler extends Thread {
                             printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (inputArray.length < 3) {
-                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
-                            break;
-                        }
-                        server.shareFile(user, inputArray[1], inputArray[2]);
+                        share(inputArray);
                         break;
 
                     case LOGOUT:
@@ -212,6 +208,25 @@ public class ClientHandler extends Thread {
             printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
         } catch (IllegalAccessException e) {
             printStringToClient(ServerResponse.ACCESS_DENIED);
+        }
+    }
+
+    private void share(String[] inputArray) throws IOException, SQLException {
+        if (inputArray.length < 3) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+        try {
+            Long fileId = Long.parseLong(inputArray[1]);
+            server.shareFile(user.getId(), fileId, inputArray[2]);
+            printStringToClient(ServerResponse.SHARE_SUCCESS);
+        } catch (IllegalAccessException e) {
+            printStringToClient(ServerResponse.ACCESS_DENIED);
+        } catch (NumberFormatException e) {
+            System.err.println(e.getMessage());
+            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+        } catch (IllegalArgumentException e) {
+            printStringToClient(e.getMessage());
         }
     }
 }
