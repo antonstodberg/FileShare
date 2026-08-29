@@ -101,11 +101,8 @@ public class ClientHandler extends Thread {
                             printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        if (inputArray.length < 2) {
-                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
-                            break;
-                        }
-                        server.downloadFile(user, inputArray[1]);
+
+                        downloadFile(inputArray);
                         break;
 
                     case SHARE:
@@ -163,8 +160,8 @@ public class ClientHandler extends Thread {
         }
 
         try {
-            long fileSize = Long.parseLong(inputArray[2]);
             String fileName = inputArray[1];
+            long fileSize = Long.parseLong(inputArray[2]);
 
             boolean success = server.uploadFile(fileName, fileSize, user.getId(), inputStream);
 
@@ -172,11 +169,49 @@ public class ClientHandler extends Thread {
 
         } catch (NumberFormatException e) {
             System.err.println(INTERNAL_ARGUMENT_MISMATCH + "\n ClientHandler.uploadFile(String[] inputArray) inputArray[2] -> expected long fileSize but received something else");
-            printStringToClient(ServerResponse.UPLOAD_FAILED);
+            printStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
         } catch (SQLException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.UPLOAD_FAILED);
+            printStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
         }
     }
 
+    private void downloadFile(String[] inputArray) throws IOException, SQLException {
+        if (inputArray.length < 2) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+        try {
+            long fileId = Long.parseLong(inputArray[1]);
+            DownloadData data = server.downloadFile(user.getId(), fileId);
+
+            byte[] buffer = new byte[64 * 1024];
+            long remaining = data.getSize();
+
+            try (InputStream dataInputStream = data.getInputStream()) {
+                outputStream.writeUTF(ServerResponse.DOWNLOAD_SUCCESS);
+                outputStream.writeUTF(data.getFileName());
+                outputStream.writeLong(data.getSize());
+                outputStream.flush();
+
+                while (remaining > 0) {
+                    int bytesToRead = (int) Math.min(remaining, buffer.length);
+                    int bytesRead = dataInputStream.read(buffer, 0, bytesToRead);
+
+                    if (bytesRead == -1) {
+                        throw new EOFException("File ended unexpectedly");
+                    }
+
+                    outputStream.write(buffer, 0, bytesRead);
+                    remaining -= bytesRead;
+                }
+            }
+
+        } catch (NumberFormatException e) {
+            System.err.println(e.getMessage());
+            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+        } catch (IllegalAccessException e) {
+            printStringToClient(ServerResponse.ACCESS_DENIED);
+        }
+    }
 }

@@ -13,14 +13,18 @@ public final class ServerResponse {
     public static final String USER_NOT_LOGGED_IN = "You must log in first.";
     public static final String ALREADY_LOGGED_IN = "You are already logged in.";
     public static final String ARGUMENT_MISMATCH = "Incorrect number of arguments.";
+    public static final String INCORRECT_FORMAT_ARGUMENT = "Argument given is not correct number format";
 
     // General
     public static final String UNRECOGNIZED_COMMAND = "Not a valid command.";
-    public static final String END = "<end>";
+    public static final String END = "<end>"; // to be removed
     public static final String EXIT = "exit";
     public static final String GENERAL_INTERNAL_ERROR = "Process failed due to internal error";
-    public static final String UPLOAD_FAILED = "Upload failed due to internal error";
+    public static final String UPLOAD_FAILED_INTERNAL_ERROR = "Upload failed due to internal error";
     public static final String UPLOAD_SUCCESS = "File was uploaded to your FileShare account";
-
+    public static final String UPLOAD_FAILED = "File could not upload";
+    public static final String DOWNLOAD_SUCCESS = "File successfully downloaded";
+    public static final String DOWNLOAD_FAILED = "File could not download";
+    public static final String ACCESS_DENIED = "Access denied.";
     private ServerResponse() {  }
 }

@@ -1,5 +1,6 @@
 # Users Storage files
 Storage/
+Downloads/
 
 target/
 !.mvn/wrapper/maven-wrapper.jar

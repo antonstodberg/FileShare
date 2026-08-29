@@ -2,11 +2,18 @@ generellt:
 - se över om enums används på rätt sätt, ska jag jämföra enums med enums eller textrepresentationen
 - behöver jag kolla över att användare inte har lagt in saker som kan störa sql eller liknande
 - testa alla "endpoints"
+- should share be share <fileId> <email>
+
+Server.java
+- fix ip address etc when client disconnects
+- should we allow several files with same name or not for the same user?
 
 Client.java
 - add show current user / alltid visa current user
 - add status update when long time like upload/download
 - dont show size as bytes, maybe gb/mb/kb
+- Abit wierd it returns ServerResponse in some places
+- handle if file to download have same name as a file in download folder
 
 Database.java
 - should add file return FileRecord instead?
