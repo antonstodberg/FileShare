@@ -110,39 +110,72 @@ public class Server {
 
     public String listFiles(User user) throws SQLException {
         StringBuilder sb = new StringBuilder();
-        sb.append("Your files\n");
-        sb.append(String.format("%-6s %-25s %-12s %-22s%n",
-                "ID", "NAME", "SIZE", "UPLOADED"));
 
-        sb.append(String.format("%-6s %-25s %-12s %-22s%n",
-                "------", "-------------------------", "------------", "----------------------"));
+        sb.append("Your files\n");
+        sb.append(String.format("%-6s %-25s %-12s %-22s %-30s%n",
+                "ID", "NAME", "SIZE", "UPLOADED", "SHARED TO"));
+
+        sb.append(String.format("%-6s %-25s %-12s %-22s %-30s%n",
+                "------", "-------------------------", "------------",
+                "----------------------", "------------------------------"));
 
         List<FileRecord> userFiles = database.getFilesByOwner(user.getId());
+
         for (FileRecord file : userFiles) {
-            sb.append(String.format("%-6d %-25s %-12d %-22s%n",
+            List<User> sharedUsers;
+
+            try {
+                sharedUsers = getUsersWithAccessToFile(user.getId(), file.getId());
+            } catch (FileNotFoundException | IllegalAccessException e) {
+                sharedUsers = List.of();
+            }
+
+            String sharedTo = sharedUsers.isEmpty()
+                    ? "-"
+                    : sharedUsers.stream()
+                    .map(User::getUsername)
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse("-");
+
+            sb.append(String.format("%-6d %-25s %-12d %-22s %-30s%n",
                     file.getId(),
                     file.getFileName(),
                     file.getSize(),
-                    file.getUploadedAt()));
+                    file.getUploadedAt(),
+                    sharedTo));
         }
 
         sb.append("\nShared with you\n");
         sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
                 "ID", "NAME", "SIZE", "UPLOADED", "OWNER"));
+
         sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
-                "------", "-------------------------", "------------", "----------------------", "--------------------"));
+                "------", "-------------------------", "------------",
+                "----------------------", "--------------------"));
 
         List<FileRecord> sharedFiles = database.getSharedFiles(user.getId());
+
         for (FileRecord file : sharedFiles) {
-            sb.append(String.format("%-6d %-25s %-12d %-22s %-20d%n",
+            sb.append(String.format("%-6d %-25s %-12d %-22s %-20s%n",
                     file.getId(),
                     file.getFileName(),
                     file.getSize(),
                     file.getUploadedAt(),
-                    file.getOwnerId()));
+                    database.getUser(file.getOwnerId()).getUsername()));
         }
 
         return sb.toString();
+    }
+
+    public List<User> getUsersWithAccessToFile(int ownerId, long fileId) throws FileNotFoundException, IllegalAccessException, SQLException {
+        FileRecord file = database.getFile(fileId);
+        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+
+        if (file.getOwnerId() != ownerId) {
+            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+        }
+
+        return new ArrayList<User>(database.getUsersWithFileAccess(fileId));
     }
 
     public boolean uploadFile(String fileName,

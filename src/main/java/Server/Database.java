@@ -79,6 +79,33 @@ public class Database {
     }
 
     /**
+     * Retrieves a user from the database by user id.
+     *
+     * @param userId the id to search for.
+     * @return the corresponding User object, or null if no user was found.
+     * @throws SQLException if the database query fails.
+     */
+    public User getUser(int userId) throws SQLException {
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new User(
+                            rs.getInt("id"),
+                            rs.getString("username"),
+                            rs.getString("email"),
+                            rs.getString("password")
+                    );
+                }
+            }
+
+            return null;
+        }
+    }
+
+
+    /**
      * Adds a file to the database.
      *
      * @param fileName the name of the file.
@@ -178,6 +205,28 @@ public class Database {
 
                 return fileList;
             }
+        }
+    }
+
+    /**
+     * Retrieves all users who have shared access to a specified file.
+     *
+     * @param fileId the ID of the file
+     * @return a list of users who have access to the file
+     * @throws SQLException if a database access error occurs
+     */
+    public List<User> getUsersWithFileAccess(long fileId) throws SQLException {
+        String sql = "SELECT user_id FROM file_shares WHERE file_id = ?";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setLong(1, fileId);
+            List<User> users = new ArrayList<>();
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    users.add(getUser(rs.getInt(1)));
+                }
+            }
+
+            return users;
         }
     }
 
