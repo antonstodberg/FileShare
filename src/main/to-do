@@ -6,7 +6,6 @@ generellt:
 - check if flush in more places
 
 Server.java
-- fix ip address etc when client disconnects
 - should we allow several files with same name or not for the same user?
 - do any methods need to be synchronized?
 - be able to shut down server
@@ -28,6 +27,3 @@ Database.java
 
 Client.java
 - fixa prints clientside
-
-
-- nästa: se överdatabas, förbereda för filförvaring och ägarskap
