@@ -2,9 +2,10 @@ package Client;
 
 import Server.ServerResponse;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -31,7 +32,7 @@ public class Client {
     private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
     private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
 
-    private final Socket socket = new Socket();
+    private SSLSocket socket;
     private final Scanner scanner = new Scanner(System.in);
     private DataOutputStream outputStream;
     private DataInputStream inputStream;
@@ -57,7 +58,7 @@ public class Client {
 
     public Client(String host, int port) {
         try {
-            socket.connect(new InetSocketAddress(host, port), 5000);
+            socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket(host, port);
             outputStream = new DataOutputStream(socket.getOutputStream());
             inputStream = new DataInputStream(socket.getInputStream());
         } catch (IOException e) {

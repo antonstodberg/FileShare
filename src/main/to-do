@@ -9,6 +9,7 @@ Server.java
 - fix ip address etc when client disconnects
 - should we allow several files with same name or not for the same user?
 - do any methods need to be synchronized?
+- be able to shut down server
 
 Client.java
 - add show current user / alltid visa current user

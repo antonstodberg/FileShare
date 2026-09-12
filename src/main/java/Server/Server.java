@@ -2,11 +2,12 @@ package Server;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.UnknownHostException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -14,15 +15,15 @@ import java.util.List;
 
 public class Server {
     private final static int DEFAULT_PORT = 2000;
-    private ServerSocket socket;
+    private SSLServerSocket socket;
     private List<ClientHandler> clients = new ArrayList<>();
     private Database database = new Database();
 
     public Server() { this(DEFAULT_PORT); }
     public Server(int port) {
         try {
-            socket = new ServerSocket(port);
-
+            socket = (SSLServerSocket) SSLServerSocketFactory.getDefault().createServerSocket(port);
+            socket.setNeedClientAuth(false);
         } catch (IOException e) {
             System.err.println(e.getMessage());
             System.exit(1);
@@ -55,7 +56,7 @@ public class Server {
             printServerStatus();
 
             while (true) {
-                Socket clientSocket = socket.accept();
+                SSLSocket clientSocket = (SSLSocket) socket.accept();
                 ClientHandler ch = new ClientHandler(clientSocket, this);
                 addClient(ch);
                 ch.start();
@@ -89,7 +90,6 @@ public class Server {
     public synchronized void removeClient(ClientHandler ch) {
         try { ch.getSocket().close(); } catch (IOException ignored) { }
 
-        String ip = ch.getSocket().getInetAddress().getHostAddress();
         clients.remove(ch);
         printServerStatus();
     }

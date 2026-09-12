@@ -5,7 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Database {
-    private static final String URL = "jdbc:mysql://localhost:3306/fileshare";
+    private static final String URL =
+            "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true";
     private static final String USER = "fileshare_admin";
     private static final String PASSWORD = "581039";
 
