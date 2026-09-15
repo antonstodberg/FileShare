@@ -1,4 +1,4 @@
-package Server;
+package Protocol;
 
 public final class ServerResponse {
     // FOR USER
@@ -17,7 +17,6 @@ public final class ServerResponse {
 
     // General
     public static final String UNRECOGNIZED_COMMAND = "Not a valid command.";
-    public static final String END = "<end>"; // to be removed
     public static final String EXIT = "exit";
     public static final String GENERAL_INTERNAL_ERROR = "Process failed due to internal error";
     public static final String UPLOAD_FAILED_INTERNAL_ERROR = "Upload failed due to internal error";

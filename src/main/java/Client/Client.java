@@ -1,11 +1,11 @@
 package Client;
 
-import Server.ServerResponse;
+import Protocol.ServerResponse;
+import Protocol.UserCommands;
 
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;

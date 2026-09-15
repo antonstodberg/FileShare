@@ -1,5 +1,6 @@
 package Server;
 
+import Protocol.ServerResponse;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import javax.net.ssl.SSLServerSocket;

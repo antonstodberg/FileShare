@@ -4,7 +4,8 @@ import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 
-import Client.UserCommands;
+import Protocol.UserCommands;
+import Protocol.ServerResponse;
 
 public class ClientHandler extends Thread {
 

@@ -1,4 +1,4 @@
-package Client;
+package Protocol;
 
 public enum UserCommands {
     LOGIN("login"),
