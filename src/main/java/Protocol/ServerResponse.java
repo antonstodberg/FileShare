@@ -14,6 +14,7 @@ public final class ServerResponse {
     public static final String ALREADY_LOGGED_IN = "You are already logged in.";
     public static final String ARGUMENT_MISMATCH = "Incorrect number of arguments.";
     public static final String INCORRECT_FORMAT_ARGUMENT = "Argument given is not correct number format";
+    public static final String USER_NOT_FOUND = "Other user not found";
 
     // General
     public static final String UNRECOGNIZED_COMMAND = "Not a valid command.";

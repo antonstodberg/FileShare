@@ -241,7 +241,7 @@ public class Server {
         User userToShare = database.getUser(username);
 
         if (userToShare == null) {
-            throw new IllegalArgumentException("user: " + username + "not found");
+            throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
         }
 
         if (database.hasAccess(userToShare.getId(), fileId)) {
@@ -262,7 +262,7 @@ public class Server {
         User userToUnshare = database.getUser(username);
 
         if (userToUnshare == null) {
-            throw new IllegalArgumentException("user: " + username + "not found");
+            throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
         }
 
         if (!database.hasAccess(userToUnshare.getId(), fileId)) {
