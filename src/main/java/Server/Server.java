@@ -1,7 +1,7 @@
 package Server;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
-
+import Protocol.Response;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -169,10 +169,10 @@ public class Server {
 
     public List<User> getUsersWithAccessToFile(int ownerId, long fileId) throws FileNotFoundException, IllegalAccessException, SQLException {
         FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+        if (file == null) throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
 
         if (file.getOwnerId() != ownerId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+            throw new IllegalAccessException(Response.USER_NOT_OWN_FILE.name());
         }
 
         return new ArrayList<User>(database.getUsersWithFileAccess(fileId));
@@ -198,12 +198,12 @@ public class Server {
 
     public DownloadData downloadFile(int userId, long fileId) throws SQLException, IOException, IllegalAccessException {
         FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+        if (file == null) throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
 
         if (database.hasAccess(userId, fileId)) {
             return new DownloadData(FileStorage.read(fileId), database.getFile(fileId));
         } else {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_ACCESS_TO_FILE);
+            throw new IllegalAccessException(Response.USER_NOT_ACCESS_TO_FILE.name());
         }
     }
 
@@ -213,16 +213,16 @@ public class Server {
         FileRecord file = database.getFile(fileId);
 
         if (file == null) {
-            throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+            throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
         }
 
         if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+            throw new IllegalAccessException(Response.USER_NOT_OWN_FILE.name());
         }
 
         if (!FileStorage.exists(fileId)) {
             database.deleteFile(fileId);
-            throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+            throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
         }
 
         FileStorage.delete(fileId);
@@ -231,20 +231,20 @@ public class Server {
 
     public void shareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+        if (file == null) throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
 
         if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+            throw new IllegalAccessException(Response.USER_NOT_OWN_FILE.name());
         }
 
         User userToShare = database.getUser(username);
 
         if (userToShare == null) {
-            throw new IllegalArgumentException("user: " + username + "not found");
+            throw new IllegalArgumentException(Response.USER_NOT_FOUND.name());
         }
 
         if (database.hasAccess(userToShare.getId(), fileId)) {
-            throw new IllegalArgumentException(ServerResponse.USER_ALREADY_ACCESS_FILE);
+            throw new IllegalArgumentException(Response.USER_ALREADY_ACCESS_FILE.name());
         }
 
         database.shareFileToUser(fileId, userToShare.getId());
@@ -252,10 +252,10 @@ public class Server {
 
     public void unshareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+        if (file == null) throw new FileNotFoundException(Response.FILE_DOES_NOT_EXIST.name());
 
         if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+            throw new IllegalAccessException(Response.USER_NOT_OWN_FILE.name());
         }
 
         User userToUnshare = database.getUser(username);
@@ -265,7 +265,7 @@ public class Server {
         }
 
         if (!database.hasAccess(userToUnshare.getId(), fileId)) {
-            throw new IllegalArgumentException(ServerResponse.USER_NOT_ACCESS_TO_FILE);
+            throw new IllegalArgumentException(Response.USER_NOT_ACCESS_TO_FILE.name());
         }
 
         database.removeSharedAccessToFile(fileId, userToUnshare.getId());

@@ -1,11 +1,10 @@
 package Client;
 
 import Server.ServerResponse;
-
+import Protocol.Commands;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -15,18 +14,18 @@ public class Client {
     private final static int DEFAULT_PORT = 2000;
 
     private final static String C_WELCOME_MESSAGE = "\nFILESHARE\n"
-            + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
-            + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
+            + Commands.LOGIN.getValue() + " <username> <password> -> log in to already registered user\n"
+            + Commands.REGISTER.getValue() + " <username> <email> <password> -> register new user and log in";
 
     private final static String C_ENTER_COMMAND = "\nEnter command:\n"
-            + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
-            + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
-            + UserCommands.DOWNLOAD.getCommand() + " <fileId> -> download file from server to computer\n"
-            + UserCommands.DELETE.getCommand() + " <fileId> -> delete file from server\n"
-            + UserCommands.SHARE.getCommand() + " <fileId> <username> -> share file from your account to the specified user\n"
-            + UserCommands.UNSHARE.getCommand() + " <fileId> <username> -> remove that users access to file\n"
-            + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
-            + UserCommands.EXIT.getCommand() + " -> close program";
+            + Commands.LIST.getValue() + " -> list all files on server owned or shared with you\n"
+            + Commands.UPLOAD.getValue() + " <filepath> -> upload a local file to the server\n"
+            + Commands.DOWNLOAD.getValue() + " <fileId> -> download file from server to computer\n"
+            + Commands.DELETE.getValue() + " <fileId> -> delete file from server\n"
+            + Commands.SHARE.getValue() + " <fileId> <username> -> share file from your account to the specified user\n"
+            + Commands.UNSHARE.getValue() + " <fileId> <username> -> remove that users access to file\n"
+            + Commands.LOGOUT.getValue() + " -> log out current user\n"
+            + Commands.EXIT.getValue() + " -> close program";
 
     private final static String C_CONTINUE_LOOP = "Press enter to continue";
     private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
@@ -118,7 +117,7 @@ public class Client {
 
                 String command = scanner.nextLine();
                 String[] inputArray = command.trim().split("\\s+");
-                UserCommands commandType = UserCommands.fromCommand(inputArray[0]);
+                Commands commandType = Commands.fromString(inputArray[0]);
 
                 if (commandType == null) {
                     System.err.println(ServerResponse.UNRECOGNIZED_COMMAND);
@@ -172,7 +171,7 @@ public class Client {
         String filename = path.getFileName().toString();
         long fileSize = Files.size(path);
 
-        outputStream.writeUTF(UserCommands.UPLOAD.getCommand() + " " + filename + " " + fileSize);
+        outputStream.writeUTF(Commands.UPLOAD.getValue() + " " + filename + " " + fileSize);
 
         try (InputStream fileIn = Files.newInputStream(path)) {
             byte[] buffer = new byte[64 * 1024];
@@ -191,7 +190,7 @@ public class Client {
     private String downloadFile(String[] inputArray) throws IOException {
         if (inputArray.length < 2) return ServerResponse.ARGUMENT_MISMATCH;
 
-        outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
+        outputStream.writeUTF(Commands.DOWNLOAD.getValue() + " " + inputArray[1]);
 
         String response = readResponse();
 

@@ -4,6 +4,8 @@ generellt:
 - testa alla "endpoints"
 - should share be share <fileId> <email>
 - check if flush in more places
+- fix string splitting issues
+- add documentation from either main or ssl, showing before and after change command/response
 
 Server.java
 - should we allow several files with same name or not for the same user?
