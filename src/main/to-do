@@ -2,29 +2,5 @@ generellt:
 - testa alla "endpoints"
 - kolla igenom ordningen av variabler/metoder och om kod borde delas upp eller refaktoreras
 
-Server.java
-- should we allow several files with same name or not for the same user?
-- do any methods need to be synchronized?
-- be able to shut down server
-
-Client.java
-- add show current user / alltid visa current user
-- add status update when long time like upload/download
-- dont show size as bytes, maybe gb/mb/kb
-- Abit wierd it returns ServerResponse in some places
-- handle if file to download have same name as a file in download folder
-- add shared to in list
-- otydligt att commands inte fungerar i enter läge
-
 Database.java
 - need to fix the ssl issue
-- should add file return FileRecord instead?
-- look through if all should throw a la getFilesByUser()
-    // get files shared to you?
-    // shouldnt there be checks anywhere that the user owns the files theyre trying to get
-
-Client.java
-- fixa prints clientside
-
-ClientHandler.java
-- kolla igenom argument checks
