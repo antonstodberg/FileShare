@@ -33,6 +33,8 @@ public final class ServerResponse {
     public static final String USER_ALREADY_ACCESS_FILE = "User already has access to this file";
     public static final String DELETE_SUCCESS = "File was deleted";
     public static final String UNSHARE_SUCCESS = "File no longer shared to other user";
+    public static final String CAN_NOT_SHARE_FILE_TO_SELF = "File can not be shared to its owner";
+    public static final String CAN_NOT_UNSHARE_FILE_TO_SELF = "File can not be unshared from its owner";
 
     private ServerResponse() {  }
 }

@@ -43,13 +43,18 @@ public class Server {
         }
         int port = socket.getLocalPort();
         System.out.println(
-                "\n*****************************\n" +
-                        "Server running. \n" +
-                        "Host: " + host + '\n' +
-                        "Port: " + port + '\n' +
-                        "#Connected clients: " + clients.size() +
-                        "\n*****************************\n"
+                "\n*****************************\n"
+                + "Server running. \n"
+                + "Host: " + host + '\n'
+                + "Port: " + port + '\n'
+                + "#Connected clients: " + clients.size()
+                + "\n*****************************\n"
+                + "\nEnter 'exit' to shut down server safely.\n"
         );
+    }
+
+    private String formatFileSize(long bytes) {
+
     }
 
     public void start() {
@@ -141,7 +146,7 @@ public class Server {
             sb.append(String.format("%-6d %-25s %-12d %-22s %-30s%n",
                     file.getId(),
                     file.getFileName(),
-                    file.getSize(),
+                    formatFileSize(file.getSize()),
                     file.getUploadedAt(),
                     sharedTo));
         }
@@ -232,7 +237,10 @@ public class Server {
 
     public void shareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = database.getFile(fileId);
+
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+
+        if (file.getOwnerId() == userId) throw new IllegalArgumentException(ServerResponse.CAN_NOT_SHARE_FILE_TO_SELF);
 
         if (file.getOwnerId() != userId) {
             throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
@@ -244,7 +252,7 @@ public class Server {
             throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
         }
 
-        if (database.hasAccess(userToShare.getId(), fileId)) {
+        if (database.hasSharedAccess(userToShare.getId(), fileId)) {
             throw new IllegalArgumentException(ServerResponse.USER_ALREADY_ACCESS_FILE);
         }
 
@@ -254,6 +262,8 @@ public class Server {
     public void unshareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = database.getFile(fileId);
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+
+        if (file.getOwnerId() == userId) throw new IllegalArgumentException(ServerResponse.CAN_NOT_UNSHARE_FILE_TO_SELF);
 
         if (file.getOwnerId() != userId) {
             throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
@@ -265,7 +275,7 @@ public class Server {
             throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
         }
 
-        if (!database.hasAccess(userToUnshare.getId(), fileId)) {
+        if (!database.hasSharedAccess(userToUnshare.getId(), fileId)) {
             throw new IllegalArgumentException(ServerResponse.USER_NOT_ACCESS_TO_FILE);
         }
 

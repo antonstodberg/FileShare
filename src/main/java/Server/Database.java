@@ -319,4 +319,31 @@ public class Database {
 
         return false;
     }
+
+    /**
+     * Checks if a user has rights to access a file
+     * through shared access from another user.
+     *
+     * Note: will return false if user owns file
+     *
+     * @param userId the ID of the user accessing the file.
+     * @param fileId the ID of the file to be accessed.
+     * @return true if the user has shared access, otherwise false.
+     * @throws SQLException if a database error occurs.
+     */
+    public boolean hasSharedAccess(int userId, long fileId) throws SQLException {
+        FileRecord fr = getFile(fileId);
+        if (fr == null) return false;
+
+        String sql = "SELECT 1 FROM file_shares WHERE file_id = ? AND user_id = ?";
+        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+            ps.setLong(1, fileId);
+            ps.setInt(2, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return true;
+            }
+        }
+
+        return false;
+    }
 }

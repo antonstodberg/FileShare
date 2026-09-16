@@ -54,30 +54,15 @@ public class ClientHandler extends Thread {
                             printStringToClient(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
-                        if (inputArray.length < 3) {
-                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
-                            break;
-                        }
-                        user = server.login(inputArray[1], inputArray[2]);
-                        if (user == null) {
-                            printStringToClient(ServerResponse.LOGIN_FAILED);
-                        } else {
-                            printStringToClient(ServerResponse.LOGIN_SUCCESS);
-                        }
+                        login(inputArray);
                         break;
 
                     case REGISTER:
-                        if (inputArray.length < 4) {
-                            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+                        if (user != null) {
+                            printStringToClient(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
-                        user = server.register(inputArray[1], inputArray[2], inputArray[3]);
-
-                        if (user == null) {
-                            printStringToClient(ServerResponse.REGISTER_FAILED);
-                        } else {
-                            printStringToClient(ServerResponse.REGISTER_SUCCESS);
-                        }
+                        register(inputArray);
                         break;
 
                     case LIST:
@@ -168,6 +153,33 @@ public class ClientHandler extends Thread {
             outputStream.flush();
         } catch (IOException e) {
             throw new RuntimeException(e); // also should this be done
+        }
+    }
+
+    private void login(String[] inputArray) throws SQLException {
+        if (inputArray.length == 3) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+        user = server.login(inputArray[1], inputArray[2]);
+        if (user == null) {
+            printStringToClient(ServerResponse.LOGIN_FAILED);
+        } else {
+            printStringToClient(ServerResponse.LOGIN_SUCCESS);
+        }
+    }
+
+    private void register(String[] inputArray) throws SQLException {
+        if (inputArray.length == 4) {
+            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+            return;
+        }
+        user = server.register(inputArray[1], inputArray[2], inputArray[3]);
+
+        if (user == null) {
+            printStringToClient(ServerResponse.REGISTER_FAILED);
+        } else {
+            printStringToClient(ServerResponse.REGISTER_SUCCESS);
         }
     }
 
