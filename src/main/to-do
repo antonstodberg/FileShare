@@ -1,14 +1,11 @@
 generellt:
-- se över om enums används på rätt sätt, ska jag jämföra enums med enums eller textrepresentationen
-- behöver jag kolla över att användare inte har lagt in saker som kan störa sql eller liknande
 - testa alla "endpoints"
-- should share be share <fileId> <email>
-- check if flush in more places
+- kolla igenom ordningen av variabler/metoder och om kod borde delas upp eller refaktoreras
 
 Server.java
-- fix ip address etc when client disconnects
 - should we allow several files with same name or not for the same user?
 - do any methods need to be synchronized?
+- be able to shut down server
 
 Client.java
 - add show current user / alltid visa current user
@@ -20,6 +17,7 @@ Client.java
 - otydligt att commands inte fungerar i enter läge
 
 Database.java
+- need to fix the ssl issue
 - should add file return FileRecord instead?
 - look through if all should throw a la getFilesByUser()
     // get files shared to you?
@@ -28,5 +26,5 @@ Database.java
 Client.java
 - fixa prints clientside
 
-
-- nästa: se överdatabas, förbereda för filförvaring och ägarskap
+ClientHandler.java
+- kolla igenom argument checks

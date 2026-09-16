@@ -2,6 +2,12 @@
 Storage/
 Downloads/
 
+#SSL
+keystore
+truststore
+fileshare.crt
+
+
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

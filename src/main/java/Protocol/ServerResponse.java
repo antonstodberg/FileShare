@@ -1,4 +1,4 @@
-package Server;
+package Protocol;
 
 public final class ServerResponse {
     // FOR USER
@@ -14,10 +14,10 @@ public final class ServerResponse {
     public static final String ALREADY_LOGGED_IN = "You are already logged in.";
     public static final String ARGUMENT_MISMATCH = "Incorrect number of arguments.";
     public static final String INCORRECT_FORMAT_ARGUMENT = "Argument given is not correct number format";
+    public static final String USER_NOT_FOUND = "Other user not found";
 
     // General
     public static final String UNRECOGNIZED_COMMAND = "Not a valid command.";
-    public static final String END = "<end>"; // to be removed
     public static final String EXIT = "exit";
     public static final String GENERAL_INTERNAL_ERROR = "Process failed due to internal error";
     public static final String UPLOAD_FAILED_INTERNAL_ERROR = "Upload failed due to internal error";
@@ -33,6 +33,8 @@ public final class ServerResponse {
     public static final String USER_ALREADY_ACCESS_FILE = "User already has access to this file";
     public static final String DELETE_SUCCESS = "File was deleted";
     public static final String UNSHARE_SUCCESS = "File no longer shared to other user";
+    public static final String CAN_NOT_SHARE_FILE_TO_SELF = "File can not be shared to its owner";
+    public static final String CAN_NOT_UNSHARE_FILE_TO_SELF = "File can not be unshared from its owner";
 
     private ServerResponse() {  }
 }

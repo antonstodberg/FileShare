@@ -1,10 +1,11 @@
 package Client;
 
-import Server.ServerResponse;
+import Protocol.ServerResponse;
+import Protocol.UserCommands;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Scanner;
@@ -27,14 +28,18 @@ public class Client {
             + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
             + UserCommands.EXIT.getCommand() + " -> close program";
 
-    private final static String C_CONTINUE_LOOP = "Press enter to continue";
     private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
     private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
+    private final static String M_ARGUMENT_MISMATCH = "Incorrect number of arguments.";
+    private final static String M_DOWNLOAD_SUCCESS = "File was downloaded to your FileShare/Downloads folder";
+    private final static String M_NOT_A_VALID_COMMAND = "Not a valid command.";
 
-    private final Socket socket = new Socket();
+    private SSLSocket socket;
     private final Scanner scanner = new Scanner(System.in);
     private DataOutputStream outputStream;
     private DataInputStream inputStream;
+
+    private String currentUser = "";
 
     private static final Path DOWNLOAD_PATH =
             Path.of(System.getProperty("user.dir"), "Downloads");
@@ -57,7 +62,7 @@ public class Client {
 
     public Client(String host, int port) {
         try {
-            socket.connect(new InetSocketAddress(host, port), 5000);
+            socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket(host, port);
             outputStream = new DataOutputStream(socket.getOutputStream());
             inputStream = new DataInputStream(socket.getInputStream());
         } catch (IOException e) {
@@ -68,11 +73,11 @@ public class Client {
 
     private void printConnectionInfo() {
         System.out.println(
-                        "\n*****************************\n" +
-                        "Connection established. \n" +
-                        "Host: " + socket.getInetAddress().getHostName() + '\n' +
-                        "Port: " + socket.getPort() + '\n' +
-                        "*****************************"
+                        "\n*****************************\n"
+                        + "Connection established. \n"
+                        + "Host: " + socket.getInetAddress().getHostName() + '\n'
+                        + "Port: " + socket.getPort() + '\n'
+                        + "*****************************"
         );
     }
 
@@ -91,6 +96,17 @@ public class Client {
             System.out.println(C_WELCOME_MESSAGE);
             System.out.print("> ");
             String command = scanner.nextLine();
+            if (command.isBlank()) {
+                System.err.println(M_NOT_A_VALID_COMMAND);
+                continue;
+            }
+            String[] inputArray = command.trim().split("\\s+");
+
+            if (UserCommands.fromCommand(inputArray[0]) == null) {
+                System.err.println(M_NOT_A_VALID_COMMAND);
+                continue;
+            }
+
             try {
                 outputStream.writeUTF(command);
                 outputStream.flush();
@@ -100,7 +116,10 @@ public class Client {
                 if (response.equals(ServerResponse.EXIT)) shutdownClient();
 
                 if (response.equals(ServerResponse.LOGIN_SUCCESS)
-                    || response.equals(ServerResponse.REGISTER_SUCCESS)) break;
+                    || response.equals(ServerResponse.REGISTER_SUCCESS)) {
+                    currentUser = inputArray[1];
+                    break;
+                }
 
             } catch (IOException e) {
                 System.err.println(e.getMessage());
@@ -112,15 +131,19 @@ public class Client {
     private void commandLoop() {
         while (true) {
             try {
-                System.out.println(C_ENTER_COMMAND);
+                System.out.println("\nFILESHARE\nLogged in as: " + currentUser + C_ENTER_COMMAND);
                 System.out.print("> ");
 
                 String command = scanner.nextLine();
+                if (command.isBlank()) {
+                    System.err.println(M_NOT_A_VALID_COMMAND);
+                    continue;
+                }
                 String[] inputArray = command.trim().split("\\s+");
                 UserCommands commandType = UserCommands.fromCommand(inputArray[0]);
 
                 if (commandType == null) {
-                    System.err.println(ServerResponse.UNRECOGNIZED_COMMAND);
+                    System.err.println(M_NOT_A_VALID_COMMAND);
                     continue;
                 }
 
@@ -148,11 +171,9 @@ public class Client {
                 }
 
                 if (response.equals(ServerResponse.LOGOUT)) {
+                    currentUser = "";
                     return;
                 }
-
-                System.out.println(C_CONTINUE_LOOP);
-                scanner.nextLine();
             } catch (IOException e) {
                 System.err.println(e.getMessage());
                 shutdownClient();
@@ -162,7 +183,7 @@ public class Client {
 
     private String uploadFile(String[] inputArray) throws IOException {
 
-        if (inputArray.length < 2) return ServerResponse.ARGUMENT_MISMATCH;
+        if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
         Path path = Path.of(inputArray[1]);
 
@@ -172,6 +193,8 @@ public class Client {
         long fileSize = Files.size(path);
 
         outputStream.writeUTF(UserCommands.UPLOAD.getCommand() + " " + filename + " " + fileSize);
+
+        System.out.println("Uploading...");
 
         try (InputStream fileIn = Files.newInputStream(path)) {
             byte[] buffer = new byte[64 * 1024];
@@ -188,7 +211,7 @@ public class Client {
     }
 
     private String downloadFile(String[] inputArray) throws IOException {
-        if (inputArray.length < 2) return ServerResponse.ARGUMENT_MISMATCH;
+        if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
         outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
 
@@ -200,6 +223,21 @@ public class Client {
 
         String fileName = readResponse();
         long fileSize = inputStream.readLong();
+
+        String originalFileName = fileName;
+        int c = 0;
+
+        int dot = originalFileName.lastIndexOf('.');
+
+        String name = dot > 0 ? originalFileName.substring(0, dot) : originalFileName;
+        String extension = dot > 0 ? originalFileName.substring(dot) : "";
+
+        while (Files.exists(DOWNLOAD_PATH.resolve(fileName))) {
+            ++c;
+            fileName = name + "(" + c + ")" + extension;
+        }
+
+        System.out.println("Downloading...");
 
         try (OutputStream fileOut = new FileOutputStream(DOWNLOAD_PATH.resolve(fileName).toFile())) {
             byte[] buffer = new byte[64 * 1024];
@@ -214,7 +252,7 @@ public class Client {
                 remaining -= bytesRead;
             }
 
-            return "File was downloaded to your FileShare/Downloads folder";
+            return M_DOWNLOAD_SUCCESS;
 
         } catch (FileNotFoundException e) {
             return M_FNF_OR_DOES_NOT_EXIST;

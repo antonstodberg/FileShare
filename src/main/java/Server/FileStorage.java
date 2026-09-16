@@ -82,7 +82,6 @@ public class FileStorage {
      *  @return true if the file exists, otherwise false.
      *  */
     public static boolean exists(long fileId) {
-        Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));
-        return Files.exists(filePath);
+        return Files.isRegularFile(STORAGE_PATH.resolve(String.valueOf(fileId)));
     }
 }
