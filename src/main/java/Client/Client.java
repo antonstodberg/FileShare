@@ -32,6 +32,7 @@ public class Client {
     private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
     private final static String M_ARGUMENT_MISMATCH = "Incorrect number of arguments.";
     private final static String M_DOWNLOAD_SUCCESS = "File was downloaded to your FileShare/Downloads folder";
+    private final static String M_NOT_A_VALID_COMMAND = "Not a valid command.";
 
     private SSLSocket socket;
     private final Scanner scanner = new Scanner(System.in);
@@ -39,7 +40,6 @@ public class Client {
     private DataInputStream inputStream;
 
     private String currentUser = "";
-    private String m_commandLoop_title_user = "\nFILESHARE\n" + "Logged in as: " + currentUser;
 
     private static final Path DOWNLOAD_PATH =
             Path.of(System.getProperty("user.dir"), "Downloads");
@@ -96,6 +96,17 @@ public class Client {
             System.out.println(C_WELCOME_MESSAGE);
             System.out.print("> ");
             String command = scanner.nextLine();
+            if (command.isBlank()) {
+                System.err.println(M_NOT_A_VALID_COMMAND);
+                continue;
+            }
+            String[] inputArray = command.trim().split("\\s+");
+
+            if (UserCommands.fromCommand(inputArray[0]) == null) {
+                System.err.println(M_NOT_A_VALID_COMMAND);
+                continue;
+            }
+
             try {
                 outputStream.writeUTF(command);
                 outputStream.flush();
@@ -106,7 +117,6 @@ public class Client {
 
                 if (response.equals(ServerResponse.LOGIN_SUCCESS)
                     || response.equals(ServerResponse.REGISTER_SUCCESS)) {
-                    String[] inputArray = command.trim().split("\\s+");
                     currentUser = inputArray[1];
                     break;
                 }
@@ -121,15 +131,19 @@ public class Client {
     private void commandLoop() {
         while (true) {
             try {
-                System.out.println(m_commandLoop_title_user + C_ENTER_COMMAND);
+                System.out.println("\nFILESHARE\nLogged in as: " + currentUser + C_ENTER_COMMAND);
                 System.out.print("> ");
 
                 String command = scanner.nextLine();
+                if (command.isBlank()) {
+                    System.err.println(M_NOT_A_VALID_COMMAND);
+                    continue;
+                }
                 String[] inputArray = command.trim().split("\\s+");
                 UserCommands commandType = UserCommands.fromCommand(inputArray[0]);
 
                 if (commandType == null) {
-                    System.err.println("Not a valid command.");
+                    System.err.println(M_NOT_A_VALID_COMMAND);
                     continue;
                 }
 
@@ -169,7 +183,7 @@ public class Client {
 
     private String uploadFile(String[] inputArray) throws IOException {
 
-        if (inputArray.length < 2) return M_ARGUMENT_MISMATCH;
+        if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
         Path path = Path.of(inputArray[1]);
 
@@ -197,7 +211,7 @@ public class Client {
     }
 
     private String downloadFile(String[] inputArray) throws IOException {
-        if (inputArray.length < 2) return M_ARGUMENT_MISMATCH;
+        if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
         outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
 

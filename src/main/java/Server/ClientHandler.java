@@ -41,17 +41,21 @@ public class ClientHandler extends Thread {
             boolean running = true;
             while (running) {
                 input = inputStream.readUTF();
+                if (input.isBlank()) {
+                    sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+                    continue;
+                }
                 String[] inputArray = input.trim().split("\\s+");
                 UserCommands command = UserCommands.fromCommand(inputArray[0]);
                 if (command == null) {
-                    printStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+                    sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
                     continue;
                 }
 
                 switch (command) {
                     case LOGIN:
                         if (user != null) {
-                            printStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                            sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
                         login(inputArray);
@@ -59,7 +63,7 @@ public class ClientHandler extends Thread {
 
                     case REGISTER:
                         if (user != null) {
-                            printStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                            sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
                             break;
                         }
                         register(inputArray);
@@ -67,15 +71,15 @@ public class ClientHandler extends Thread {
 
                     case LIST:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
-                        printStringToClient(server.listFiles(user));
+                        sendStringToClient(server.listFiles(user));
                         break;
 
                     case UPLOAD:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
 
@@ -84,7 +88,7 @@ public class ClientHandler extends Thread {
 
                     case DOWNLOAD:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
 
@@ -93,7 +97,7 @@ public class ClientHandler extends Thread {
 
                     case DELETE:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
                         delete(inputArray);
@@ -101,7 +105,7 @@ public class ClientHandler extends Thread {
 
                     case SHARE:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
                         share(inputArray);
@@ -109,7 +113,7 @@ public class ClientHandler extends Thread {
 
                     case UNSHARE:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
                         unshare(inputArray);
@@ -117,26 +121,28 @@ public class ClientHandler extends Thread {
 
                     case LOGOUT:
                         if (user == null) {
-                            printStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
                             break;
                         }
 
                         user = null;
-                        printStringToClient(ServerResponse.LOGOUT);
+                        sendStringToClient(ServerResponse.LOGOUT);
                         break;
 
                     case EXIT:
-                        printStringToClient(ServerResponse.EXIT);
+                        sendStringToClient(ServerResponse.EXIT);
                         running = false;
                         break;
                 }
             }
-        } catch (IOException e) {
-            System.err.println(e.getMessage());
-            printStringToClient(e.getMessage());
-        } catch (SQLException e) {
-            printStringToClient(e.getMessage());
-            throw new RuntimeException(e); // should this be done here?
+        } catch (IOException | SQLException e) {
+            if (e.getMessage() != null) {
+                System.err.println(e.getMessage());
+                try {
+                    sendStringToClient(e.getMessage());
+                } catch (IOException ignored) {
+                }
+            }
         } finally {
             try {
                 inputStream.close();
@@ -147,46 +153,42 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void printStringToClient(String s) {
-        try {
-            outputStream.writeUTF(s);
-            outputStream.flush();
-        } catch (IOException e) {
-            throw new RuntimeException(e); // also should this be done
-        }
+    private void sendStringToClient(String s) throws IOException {
+        outputStream.writeUTF(s);
+        outputStream.flush();
     }
 
-    private void login(String[] inputArray) throws SQLException {
-        if (inputArray.length == 3) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+    private void login(String[] inputArray) throws SQLException, IOException {
+        if (inputArray.length != 3) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
         user = server.login(inputArray[1], inputArray[2]);
         if (user == null) {
-            printStringToClient(ServerResponse.LOGIN_FAILED);
+            sendStringToClient(ServerResponse.LOGIN_FAILED);
         } else {
-            printStringToClient(ServerResponse.LOGIN_SUCCESS);
+            sendStringToClient(ServerResponse.LOGIN_SUCCESS);
         }
     }
 
-    private void register(String[] inputArray) throws SQLException {
-        if (inputArray.length == 4) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+    private void register(String[] inputArray) throws SQLException, IOException {
+        if (inputArray.length != 4) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
         user = server.register(inputArray[1], inputArray[2], inputArray[3]);
 
         if (user == null) {
-            printStringToClient(ServerResponse.REGISTER_FAILED);
+            sendStringToClient(ServerResponse.REGISTER_FAILED);
         } else {
-            printStringToClient(ServerResponse.REGISTER_SUCCESS);
+            sendStringToClient(ServerResponse.REGISTER_SUCCESS);
         }
     }
 
     private void uploadFile(String[] inputArray) throws IOException {
-        if (inputArray.length < 3) {
+        if (inputArray.length != 3) {
             System.err.println(INTERNAL_ARGUMENT_MISMATCH);
-            printStringToClient(ServerResponse.UPLOAD_FAILED);
+            sendStringToClient(ServerResponse.UPLOAD_FAILED);
             return;
         }
 
@@ -196,20 +198,20 @@ public class ClientHandler extends Thread {
 
             boolean success = server.uploadFile(fileName, fileSize, user.getId(), inputStream);
 
-            printStringToClient(success ? ServerResponse.UPLOAD_SUCCESS : ServerResponse.UPLOAD_FAILED);
+            sendStringToClient(success ? ServerResponse.UPLOAD_SUCCESS : ServerResponse.UPLOAD_FAILED);
 
         } catch (NumberFormatException e) {
             System.err.println(INTERNAL_ARGUMENT_MISMATCH + "\n ClientHandler.uploadFile(String[] inputArray) inputArray[2] -> expected long fileSize but received something else");
-            printStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
+            sendStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
         } catch (SQLException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
+            sendStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
         }
     }
 
     private void downloadFile(String[] inputArray) throws IOException, SQLException {
-        if (inputArray.length < 2) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+        if (inputArray.length != 2) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
         try {
@@ -240,62 +242,62 @@ public class ClientHandler extends Thread {
 
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+            sendStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
         } catch (FileNotFoundException | IllegalAccessException e) {
-            printStringToClient(e.getMessage());
+            sendStringToClient(e.getMessage());
         }
     }
 
     private void delete(String[] inputArray) throws SQLException, IOException {
-        if (inputArray.length < 2) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+        if (inputArray.length != 2) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
 
         try {
             long fileId = Long.parseLong(inputArray[1]);
             server.deleteFile(user.getId(), fileId);
-            printStringToClient(ServerResponse.DELETE_SUCCESS);
+            sendStringToClient(ServerResponse.DELETE_SUCCESS);
 
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+            sendStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
         } catch (FileNotFoundException | IllegalAccessException e) {
-            printStringToClient(e.getMessage());
+            sendStringToClient(e.getMessage());
         }
     }
 
     private void share(String[] inputArray) throws IOException, SQLException {
-        if (inputArray.length < 3) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+        if (inputArray.length != 3) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
         try {
             long fileId = Long.parseLong(inputArray[1]);
             server.shareFile(user.getId(), fileId, inputArray[2]);
-            printStringToClient(ServerResponse.SHARE_SUCCESS);
+            sendStringToClient(ServerResponse.SHARE_SUCCESS);
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+            sendStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
         } catch (FileNotFoundException | IllegalAccessException | IllegalArgumentException e) {
-            printStringToClient(e.getMessage());
+            sendStringToClient(e.getMessage());
         }
     }
 
     private void unshare(String[] inputArray) throws IOException, SQLException {
-        if (inputArray.length < 3) {
-            printStringToClient(ServerResponse.ARGUMENT_MISMATCH);
+        if (inputArray.length != 3) {
+            sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
         try {
             long fileId = Long.parseLong(inputArray[1]);
             server.unshareFile(user.getId(), fileId, inputArray[2]);
-            printStringToClient(ServerResponse.UNSHARE_SUCCESS);
+            sendStringToClient(ServerResponse.UNSHARE_SUCCESS);
         } catch (NumberFormatException e) {
             System.err.println(e.getMessage());
-            printStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
+            sendStringToClient(ServerResponse.INCORRECT_FORMAT_ARGUMENT);
         } catch (FileNotFoundException | IllegalAccessException | IllegalArgumentException e) {
-            printStringToClient(e.getMessage());
+            sendStringToClient(e.getMessage());
         }
     }
 

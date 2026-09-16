@@ -17,6 +17,7 @@ Client.java
 - otydligt att commands inte fungerar i enter läge
 
 Database.java
+- need to fix the ssl issue
 - should add file return FileRecord instead?
 - look through if all should throw a la getFilesByUser()
     // get files shared to you?
@@ -24,3 +25,6 @@ Database.java
 
 Client.java
 - fixa prints clientside
+
+ClientHandler.java
+- kolla igenom argument checks

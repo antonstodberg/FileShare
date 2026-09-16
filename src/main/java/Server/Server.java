@@ -13,12 +13,15 @@ import java.net.UnknownHostException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Server {
     private final static int DEFAULT_PORT = 2000;
     private SSLServerSocket socket;
     private List<ClientHandler> clients = new ArrayList<>();
     private Database database = new Database();
+
+    private volatile boolean shuttingDown = false;
 
     public Server() { this(DEFAULT_PORT); }
     public Server(int port) {
@@ -54,12 +57,46 @@ public class Server {
     }
 
     private String formatFileSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
 
+        double size = bytes;
+        String[] units = {"B", "KB", "MB", "GB", "TB"};
+
+        int unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return String.format("%.2f %s", size, units[unitIndex]);
+    }
+
+    public void shutdown() {
+        shuttingDown = true;
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+        }
     }
 
     public void start() {
         try {
             printServerStatus();
+            Thread shutdownThread = new Thread(() -> {
+                Scanner scanner = new Scanner(System.in);
+
+                while (scanner.hasNextLine()) {
+                    String command = scanner.nextLine();
+
+                    if (command.equalsIgnoreCase("exit")) {
+                        shutdown();
+                        break;
+                    }
+                }
+            });
+            shutdownThread.start();
 
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) socket.accept();
@@ -74,16 +111,25 @@ public class Server {
                 e.printStackTrace();
             }
         } finally {
-            try {
-                for (Thread t : clients) {
-                    t.interrupt();
-                }
-                for (ClientHandler ch : clients) {
+            List<ClientHandler> clientsToClose;
+
+            synchronized (this) {
+                clientsToClose = new ArrayList<>(clients);
+                clients.clear();
+            }
+
+            for (ClientHandler ch : clientsToClose) {
+                ch.interrupt();
+
+                try {
                     ch.getSocket().close();
+                } catch (IOException ignored) {
                 }
+            }
+
+            try {
                 socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException ignored) {
             }
         }
     }
@@ -97,7 +143,10 @@ public class Server {
         try { ch.getSocket().close(); } catch (IOException ignored) { }
 
         clients.remove(ch);
-        printServerStatus();
+
+        if (!shuttingDown) {
+            printServerStatus();
+        }
     }
 
     public User register(String username, String email, String password) throws SQLException {
@@ -143,7 +192,7 @@ public class Server {
                     .reduce((a, b) -> a + ", " + b)
                     .orElse("-");
 
-            sb.append(String.format("%-6d %-25s %-12d %-22s %-30s%n",
+            sb.append(String.format("%-6d %-25s %-12s %-22s %-30s%n",
                     file.getId(),
                     file.getFileName(),
                     formatFileSize(file.getSize()),
@@ -162,10 +211,10 @@ public class Server {
         List<FileRecord> sharedFiles = database.getSharedFiles(user.getId());
 
         for (FileRecord file : sharedFiles) {
-            sb.append(String.format("%-6d %-25s %-12d %-22s %-20s%n",
+            sb.append(String.format("%-6d %-25s %-12s %-22s %-20s%n",
                     file.getId(),
                     file.getFileName(),
-                    file.getSize(),
+                    formatFileSize(file.getSize()),
                     file.getUploadedAt(),
                     database.getUser(file.getOwnerId()).getUsername()));
         }
@@ -240,8 +289,6 @@ public class Server {
 
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
 
-        if (file.getOwnerId() == userId) throw new IllegalArgumentException(ServerResponse.CAN_NOT_SHARE_FILE_TO_SELF);
-
         if (file.getOwnerId() != userId) {
             throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
         }
@@ -250,6 +297,10 @@ public class Server {
 
         if (userToShare == null) {
             throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
+        }
+
+        if (file.getOwnerId() == userToShare.getId()) {
+            throw new IllegalArgumentException(ServerResponse.CAN_NOT_SHARE_FILE_TO_SELF);
         }
 
         if (database.hasSharedAccess(userToShare.getId(), fileId)) {
@@ -263,8 +314,6 @@ public class Server {
         FileRecord file = database.getFile(fileId);
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
 
-        if (file.getOwnerId() == userId) throw new IllegalArgumentException(ServerResponse.CAN_NOT_UNSHARE_FILE_TO_SELF);
-
         if (file.getOwnerId() != userId) {
             throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
         }
@@ -273,6 +322,10 @@ public class Server {
 
         if (userToUnshare == null) {
             throw new IllegalArgumentException(ServerResponse.USER_NOT_FOUND);
+        }
+
+        if (file.getOwnerId() == userToUnshare.getId()) {
+            throw new IllegalArgumentException(ServerResponse.CAN_NOT_SHARE_FILE_TO_SELF);
         }
 
         if (!database.hasSharedAccess(userToUnshare.getId(), fileId)) {
