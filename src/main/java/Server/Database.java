@@ -10,19 +10,12 @@ public class Database {
     private static final String USER = "fileshare_admin";
     private static final String PASSWORD = "581039";
 
-    private Connection dbConnection;
-
     public Database() {
-        try {
-            dbConnection = DriverManager.getConnection(URL, USER, PASSWORD);
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
             System.out.println("Connected to database.");
         } catch (SQLException e) {
             throw new RuntimeException("Could not connect to database", e);
         }
-    }
-
-    public Connection getConnection() {
-        return dbConnection;
     }
 
     /**
@@ -37,7 +30,8 @@ public class Database {
      */
     public User register(String username, String email, String passwordHash) throws SQLException {
         String sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, username);
             ps.setString(2, email);
             ps.setString(3, passwordHash);
@@ -62,7 +56,8 @@ public class Database {
      */
     public User getUser(String username) throws SQLException {
         String sql = "SELECT * FROM users WHERE username = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -88,7 +83,8 @@ public class Database {
      */
     public User getUser(int userId) throws SQLException {
         String sql = "SELECT * FROM users WHERE id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -118,7 +114,8 @@ public class Database {
      */
     public long addFile(String fileName, long size, int ownerId) throws SQLException {
         String sql = "INSERT INTO files (file_name, size, owner_id) VALUES(?, ?, ?)";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, fileName);
             ps.setLong(2, size);
@@ -143,7 +140,8 @@ public class Database {
      */
     public void deleteFile(long fileId) throws SQLException {
         String sql = "DELETE FROM files WHERE id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             ps.executeUpdate();
         }
@@ -159,7 +157,8 @@ public class Database {
      */
     public FileRecord getFile(long id) throws SQLException {
         String sql = "SELECT * FROM files WHERE id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -188,7 +187,8 @@ public class Database {
     public List<FileRecord> getFilesByOwner(int ownerId) throws SQLException {
         String sql = "SELECT * FROM files WHERE owner_id = ?";
 
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, ownerId);
 
             try (ResultSet rs = ps.executeQuery()) {
@@ -218,7 +218,8 @@ public class Database {
      */
     public List<User> getUsersWithFileAccess(long fileId) throws SQLException {
         String sql = "SELECT user_id FROM file_shares WHERE file_id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             List<User> users = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
@@ -243,7 +244,8 @@ public class Database {
         String sql = "SELECT * FROM files JOIN file_shares ON files.id = file_shares.file_id WHERE user_id = ?";
 
         List<FileRecord> files = new ArrayList<>();
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -270,7 +272,8 @@ public class Database {
      */
     public void shareFileToUser(long fileId, int userId) throws SQLException {
         String sql = "INSERT INTO file_shares (file_id, user_id) VALUES(?, ?)";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             ps.setInt(2, userId);
             ps.executeUpdate();
@@ -286,7 +289,8 @@ public class Database {
      */
     public void removeSharedAccessToFile(long fileId, int userId) throws SQLException {
         String sql = "DELETE FROM file_shares WHERE file_id = ? AND user_id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             ps.setInt(2, userId);
             ps.executeUpdate();
@@ -309,7 +313,8 @@ public class Database {
         if (fr.getOwnerId() == userId) return true;
 
         String sql = "SELECT 1 FROM file_shares WHERE file_id = ? AND user_id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             ps.setInt(2, userId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -336,7 +341,8 @@ public class Database {
         if (fr == null) return false;
 
         String sql = "SELECT 1 FROM file_shares WHERE file_id = ? AND user_id = ?";
-        try (PreparedStatement ps = dbConnection.prepareStatement(sql)) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD);
+             PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, fileId);
             ps.setInt(2, userId);
             try (ResultSet rs = ps.executeQuery()) {
