@@ -4,6 +4,7 @@ import Protocol.ServerResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCrypt;
+import java.sql.DriverManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
@@ -1502,159 +1503,119 @@ class ServerTest {
      * Database cleanup
      * ---------------------------------------------------------
      */
-
     private void cleanupUser(String username)
             throws SQLException {
 
         Database database = server.getDatabase();
 
-        /*
-         * IMPORTANT:
-         *
-         * Database owns this connection.
-         * Do NOT use try-with-resources on it.
-         *
-         * Doing this:
-         *
-         * try (Connection connection =
-         *          database.getConnection()) {
-         *
-         * closes Database's connection at the end of
-         * cleanupUser(), which breaks subsequent tests.
-         */
-        Connection connection =
-                database.getConnection();
-
-        /*
-         * Find the user's ID first.
-         */
         int userId = -1;
 
-        try (PreparedStatement statement =
-                     connection.prepareStatement(
-                             "SELECT id FROM users WHERE username = ?"
-                     )) {
+        // Find user ID
+        String findUser =
+                "SELECT id FROM users WHERE username = ?";
+
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             PreparedStatement statement =
+                     connection.prepareStatement(findUser)) {
 
             statement.setString(1, username);
 
-            try (ResultSet result =
-                         statement.executeQuery()) {
-
+            try (ResultSet result = statement.executeQuery()) {
                 if (result.next()) {
-                    userId =
-                            result.getInt("id");
+                    userId = result.getInt("id");
                 }
             }
         }
 
-        /*
-         * User may not have been created if the test
-         * failed during setup.
-         */
+        // User doesn't exist, so there is nothing to clean up.
         if (userId == -1) {
             return;
         }
 
-        /*
-         * Find all files owned by this user.
-         */
-        List<Long> fileIds =
-                new ArrayList<>();
-
-        try (PreparedStatement statement =
+        // Delete shares involving this user.
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             PreparedStatement statement =
                      connection.prepareStatement(
-                             "SELECT id FROM files WHERE owner_id = ?"
-                     )) {
+                             "DELETE FROM file_shares WHERE user_id = ?")) {
 
             statement.setInt(1, userId);
-
-            try (ResultSet result =
-                         statement.executeQuery()) {
-
-                while (result.next()) {
-                    fileIds.add(
-                            result.getLong("id")
-                    );
-                }
-            }
-        }
-
-        /*
-         * Remove shares involving this user.
-         */
-        try (PreparedStatement statement =
-                     connection.prepareStatement(
-                             "DELETE FROM file_shares WHERE user_id = ?"
-                     )) {
-
-            statement.setInt(1, userId);
-
             statement.executeUpdate();
         }
 
-        /*
-         * Remove shares belonging to files owned
-         * by this user.
-         */
-        for (long fileId : fileIds) {
+        // Find files owned by this user.
+        List<Long> fileIds = new ArrayList<>();
 
-            try (PreparedStatement statement =
-                         connection.prepareStatement(
-                                 "DELETE FROM file_shares WHERE file_id = ?"
-                         )) {
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             PreparedStatement statement =
+                     connection.prepareStatement(
+                             "SELECT id FROM files WHERE owner_id = ?")) {
 
-                statement.setLong(1, fileId);
+            statement.setInt(1, userId);
 
-                statement.executeUpdate();
-            }
-        }
-
-        /*
-         * Delete physical files.
-         */
-        for (long fileId : fileIds) {
-
-            if (FileStorage.exists(fileId)) {
-
-                try {
-                    FileStorage.delete(fileId);
-
-                } catch (IOException e) {
-                    throw new SQLException(
-                            "Failed to delete test file "
-                                    + fileId,
-                            e
-                    );
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    fileIds.add(result.getLong("id"));
                 }
             }
         }
 
-        /*
-         * Delete database file records.
-         */
+        // Delete shares belonging to the user's files.
         for (long fileId : fileIds) {
-
-            try (PreparedStatement statement =
+            try (Connection connection = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                    "fileshare_admin",
+                    "581039");
+                 PreparedStatement statement =
                          connection.prepareStatement(
-                                 "DELETE FROM files WHERE id = ?"
-                         )) {
+                                 "DELETE FROM file_shares WHERE file_id = ?")) {
 
                 statement.setLong(1, fileId);
-
                 statement.executeUpdate();
+            }
+
+            // Delete physical file if it exists.
+            if (FileStorage.exists(fileId)) {
+                try {
+                    FileStorage.delete(fileId);
+                } catch (IOException e) {
+                    throw new SQLException(
+                            "Could not delete test file " + fileId, e);
+                }
             }
         }
 
-        /*
-         * Finally delete the test user.
-         */
-        try (PreparedStatement statement =
+        // Delete database file records.
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             PreparedStatement statement =
                      connection.prepareStatement(
-                             "DELETE FROM users WHERE id = ?"
-                     )) {
+                             "DELETE FROM files WHERE owner_id = ?")) {
 
             statement.setInt(1, userId);
+            statement.executeUpdate();
+        }
 
+        // Finally delete the user.
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             PreparedStatement statement =
+                     connection.prepareStatement(
+                             "DELETE FROM users WHERE id = ?")) {
+
+            statement.setInt(1, userId);
             statement.executeUpdate();
         }
     }

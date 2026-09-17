@@ -2,6 +2,7 @@ package Server;
 
 import org.junit.jupiter.api.*;
 
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -250,10 +251,15 @@ class DatabaseTest {
     }
 
     private void deleteUser(int userId) throws SQLException {
-        database.getConnection()
-                .prepareStatement(
-                        "DELETE FROM users WHERE id = " + userId
-                )
-                .executeUpdate();
+        try (var connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true",
+                "fileshare_admin",
+                "581039");
+             var statement = connection.prepareStatement(
+                     "DELETE FROM users WHERE id = ?")) {
+
+            statement.setInt(1, userId);
+            statement.executeUpdate();
+        }
     }
 }
