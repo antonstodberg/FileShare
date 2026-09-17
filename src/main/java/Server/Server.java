@@ -19,12 +19,13 @@ public class Server {
     private final static int DEFAULT_PORT = 2000;
     private SSLServerSocket socket;
     private List<ClientHandler> clients = new ArrayList<>();
-    private Database database = new Database();
+    private final Database database;
 
     private volatile boolean shuttingDown = false;
 
     public Server() { this(DEFAULT_PORT); }
     public Server(int port) {
+        database = new Database();
         try {
             socket = (SSLServerSocket) SSLServerSocketFactory.getDefault().createServerSocket(port);
             socket.setNeedClientAuth(false);
@@ -35,6 +36,10 @@ public class Server {
             System.err.println("Port: " + port + " is out of range");
             System.exit(1);
         }
+    }
+
+    Database getDatabase() {
+        return database;
     }
 
     private void printServerStatus() {

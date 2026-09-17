@@ -4,3 +4,5 @@ generellt:
 
 Database.java
 - need to fix the ssl issue
+
+- fix multiple jdbc connectiuons
