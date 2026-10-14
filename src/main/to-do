@@ -1,8 +1,6 @@
 generellt:
-- testa alla "endpoints"
 - kolla igenom ordningen av variabler/metoder och om kod borde delas upp eller refaktoreras
+- mailsend?
 
 Database.java
 - need to fix the ssl issue
-
-- fix multiple jdbc connectiuons
