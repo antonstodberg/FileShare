@@ -15,18 +15,28 @@ public class Client {
     private final static int DEFAULT_PORT = 2000;
 
     private final static String C_WELCOME_MESSAGE = "\nFILESHARE\n"
-            + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
-            + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
+            + UserCommands.LOGIN.getCommand()
+            + " <username> <password> -> log in to already registered user\n"
+            + UserCommands.REGISTER.getCommand()
+            + " <username> <email> <password> -> register new user and log in";
 
     private final static String C_ENTER_COMMAND = "\nEnter command:\n"
-            + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
-            + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
-            + UserCommands.DOWNLOAD.getCommand() + " <fileId> -> download file from server to computer\n"
-            + UserCommands.DELETE.getCommand() + " <fileId> -> delete file from server\n"
-            + UserCommands.SHARE.getCommand() + " <fileId> <username> -> share file from your account to the specified user\n"
-            + UserCommands.UNSHARE.getCommand() + " <fileId> <username> -> remove that users access to file\n"
-            + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
-            + UserCommands.EXIT.getCommand() + " -> close program";
+            + UserCommands.LIST.getCommand()
+            + " -> list all files on server owned or shared with you\n"
+            + UserCommands.UPLOAD.getCommand()
+            + " <filepath> -> upload a local file to the server\n"
+            + UserCommands.DOWNLOAD.getCommand()
+            + " <fileId> -> download file from server to computer\n"
+            + UserCommands.DELETE.getCommand()
+            + " <fileId> -> delete file from server\n"
+            + UserCommands.SHARE.getCommand()
+            + " <fileId> <username> -> share file from your account to the specified user\n"
+            + UserCommands.UNSHARE.getCommand()
+            + " <fileId> <username> -> remove that users access to file\n"
+            + UserCommands.LOGOUT.getCommand()
+            + " -> log out current user\n"
+            + UserCommands.EXIT.getCommand()
+            + " -> close program";
 
     private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
     private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
@@ -244,7 +254,7 @@ public class Client {
             long remaining = fileSize;
 
             while (remaining > 0) {
-                int bytesToRead = Math.min(buffer.length, (int)remaining);
+                int bytesToRead = (int) Math.min(buffer.length, remaining);
                 int bytesRead = inputStream.read(buffer, 0, bytesToRead);
                 if (bytesRead == -1) throw new EOFException("Connection lost");
 

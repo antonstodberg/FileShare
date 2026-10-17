@@ -12,7 +12,6 @@ public class ClientHandler extends Thread {
     public static final String INTERNAL_ARGUMENT_MISMATCH =
             "Arguments or params not correct with internal method implementation";
 
-    // could implement Runnable?
     private final Server server;
     private Socket socket;
     private DataOutputStream outputStream;
@@ -228,7 +227,7 @@ public class ClientHandler extends Thread {
                 outputStream.flush();
 
                 while (remaining > 0) {
-                    int bytesToRead = (int) Math.min(remaining, buffer.length);
+                    int bytesToRead = (int)Math.min(remaining, buffer.length);
                     int bytesRead = dataInputStream.read(buffer, 0, bytesToRead);
 
                     if (bytesRead == -1) {
