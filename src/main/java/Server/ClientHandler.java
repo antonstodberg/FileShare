@@ -36,6 +36,14 @@ public class ClientHandler extends Thread {
     @Override
     public void run() {
         try {
+
+            boolean running = true;
+
+            while (running) {
+                String input = inputStream.readUTF();
+                running = handleCommand(input);
+            }
+           /*
             String input;
             boolean running = true;
             while (running) {
@@ -134,6 +142,7 @@ public class ClientHandler extends Thread {
                         break;
                 }
             }
+            */
         } catch (IOException e) {
             System.err.println("Connection or transfer failed: " + e.getMessage());
 
@@ -151,6 +160,102 @@ public class ClientHandler extends Thread {
             } catch (IOException ignored) { }
 
             server.removeClient(this);
+        }
+    }
+
+    private boolean handleCommand(String input) throws IOException, SQLException {
+        if (input.isBlank()) {
+            sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+            continue;
+        }
+        String[] inputArray = input.trim().split("\\s+");
+        UserCommands command = UserCommands.fromCommand(inputArray[0]);
+        if (command == null) {
+            sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+            continue;
+        }
+
+        switch (command) {
+            case LOGIN:
+                if (user != null) {
+                    sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                    break;
+                }
+                login(inputArray);
+                break;
+
+            case REGISTER:
+                if (user != null) {
+                    sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                    break;
+                }
+                register(inputArray);
+                break;
+
+            case LIST:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                sendStringToClient(server.listFiles(user));
+                break;
+
+            case UPLOAD:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                uploadFile(input.trim().split("\\s+", 2));
+                break;
+
+            case DOWNLOAD:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                downloadFile(inputArray);
+                break;
+
+            case DELETE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                delete(inputArray);
+                break;
+
+            case SHARE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                share(inputArray);
+                break;
+
+            case UNSHARE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                unshare(inputArray);
+                break;
+
+            case LOGOUT:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                user = null;
+                sendStringToClient(ServerResponse.LOGOUT);
+                break;
+
+            case EXIT:
+                sendStringToClient(ServerResponse.EXIT);
+                running = false;
+                break;
         }
     }
 
