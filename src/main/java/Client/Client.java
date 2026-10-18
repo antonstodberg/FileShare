@@ -44,6 +44,8 @@ public class Client {
     private final static String M_ARGUMENT_MISMATCH = "Incorrect number of arguments.";
     private final static String M_DOWNLOAD_SUCCESS = "File was downloaded to your FileShare/Downloads folder";
     private final static String M_NOT_A_VALID_COMMAND = "Not a valid command.";
+    private final static String M_NOT_A_VALID_FILENAME = "Invalid file name";
+    private final static String M_NOT_A_VALID_FILESIZE = "Invalid file size";
 
     private SSLSocket socket;
     private final Scanner scanner = new Scanner(System.in);
@@ -192,57 +194,61 @@ public class Client {
         }
     }
 
+    /** Validates the local file, sends it to the server and returns the response. */
     private String uploadFile(String[] inputArray) throws IOException {
 
         if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
-        String filePath = inputArray[1];
+        Path filePath = parseUploadPath(inputArray[1]);
 
-        if (filePath.length() >= 2
-                && filePath.startsWith("\"")
-                && filePath.endsWith("\"")) {
-            filePath = filePath.substring(1, filePath.length() - 1);
-        }
+        if (filePath == null) return M_FNF_OR_DOES_NOT_EXIST;
 
-        if (filePath.isBlank()) {
-            return M_FNF_OR_DOES_NOT_EXIST;
-        }
+        String filename = filePath.getFileName().toString();
+        long fileSize = Files.size(filePath);
 
-        Path path;
-
-        try {
-            path = Path.of(filePath);
-        } catch (java.nio.file.InvalidPathException e) {
-            return M_FNF_OR_DOES_NOT_EXIST;
-        }
-
-        if (!Files.isRegularFile(path)) {
-            return M_FNF_OR_DOES_NOT_EXIST;
-        }
-
-        String filename = path.getFileName().toString();
-        long fileSize = Files.size(path);
-
-        if (filename == null
-                || filename.isBlank()
+        if (filename.isBlank()
                 || filename.equals(".")
                 || filename.equals("..")
                 || filename.contains("/")
                 || filename.contains("\\")
                 || filename.contains(":")
                 || filename.chars().anyMatch(Character::isISOControl)) {
-            throw new IOException("Invalid file name");
-        }
-
-        if (fileSize < 0) {
-            throw new IOException("Invalid file size");
+            return M_NOT_A_VALID_FILENAME;
         }
 
         outputStream.writeUTF(UserCommands.UPLOAD.getCommand() + " " + filename + " " + fileSize);
-
         System.out.println("Uploading...");
+        sendFileContent(filePath);
 
-        try (InputStream fileIn = Files.newInputStream(path)) {
+        return readResponse();
+    }
+
+    /** Parses a possible path; returns the Path if it identifies a regular file, otherwise NULL. */
+    private Path parseUploadPath(String filePath) {
+        if (filePath.length() >= 2
+            && filePath.startsWith("\"")
+            && filePath.endsWith("\""))
+        {
+            filePath = filePath.substring(1, filePath.length() - 1);
+        }
+
+        if (filePath.isBlank()) return null;
+
+        Path path;
+        try {
+            path = Path.of(filePath);
+        } catch (java.nio.file.InvalidPathException e) {
+            return null;
+        }
+
+        if (!Files.isRegularFile(path)) return null;
+
+        return path;
+    }
+
+    /** Sends the file contents without closing the connection's output stream. */
+    private void sendFileContent(Path filePath) throws IOException {
+        try (InputStream fileIn = Files.newInputStream(filePath)) {
             byte[] buffer = new byte[64 * 1024];
             int bytesRead;
 
@@ -252,61 +258,44 @@ public class Client {
 
             outputStream.flush();
         }
-
-        return readResponse();
     }
 
+    /** Requests a file, receives it and returns the server error or success message. */
     private String downloadFile(String[] inputArray) throws IOException {
         if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
         outputStream.writeUTF(UserCommands.DOWNLOAD.getCommand() + " " + inputArray[1]);
 
         String response = readResponse();
-
-        if (!response.equals(ServerResponse.DOWNLOAD_SUCCESS)) {
-            return response;
-        }
+        if (!response.equals(ServerResponse.DOWNLOAD_SUCCESS)) return response;
 
         String fileName = readResponse();
         long fileSize = inputStream.readLong();
 
-        String originalFileName = fileName;
-        int c = 0;
-
-        int dot = originalFileName.lastIndexOf('.');
-
-        String name = dot > 0 ? originalFileName.substring(0, dot) : originalFileName;
-        String extension = dot > 0 ? originalFileName.substring(dot) : "";
-
-        Path target = resolveDownloadPath(fileName);
-        while (Files.exists(target)) {
-            ++c;
-            fileName = name + "(" + c + ")" + extension;
-            target = resolveDownloadPath(fileName);
-        }
-
+        Path target = findAvailableDownloadPath(fileName);
         System.out.println("Downloading...");
 
+        receiveFileContent(target, fileSize);
 
+        return M_DOWNLOAD_SUCCESS;
+    }
 
-        try (OutputStream fileOut = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW)) {
-            byte[] buffer = new byte[64 * 1024];
-            long remaining = fileSize;
+    /** Finds an unused download path by adding a numeric suffix when necessary. */
+    private Path findAvailableDownloadPath(String fileName) throws IOException {
+        Path target = resolveDownloadPath(fileName);
 
-            while (remaining > 0) {
-                int bytesToRead = (int) Math.min(buffer.length, remaining);
-                int bytesRead = inputStream.read(buffer, 0, bytesToRead);
-                if (bytesRead == -1) throw new EOFException("Connection lost");
+        int dot = fileName.lastIndexOf('.');
+        String name = dot > 0 ? fileName.substring(0, dot) : fileName;
+        String extension = dot > 0 ? fileName.substring(dot) : "";
 
-                fileOut.write(buffer, 0, bytesRead);
-                remaining -= bytesRead;
-            }
+        int c = 0;
 
-            return M_DOWNLOAD_SUCCESS;
-
-        } catch (FileNotFoundException e) {
-            return M_FNF_OR_DOES_NOT_EXIST;
+        while (Files.exists(target)) {
+            ++c;
+            target = resolveDownloadPath(name + "(" + c + ")" + extension);
         }
+
+        return target;
     }
 
     private Path resolveDownloadPath(String fileName) throws IOException {
@@ -329,6 +318,26 @@ public class Client {
         }
 
         return target;
+    }
+
+    /** Receives exactly fileSize bytes into a new file; throws if reception fails. */
+    private void receiveFileContent(Path target, long fileSize) throws IOException {
+        if (fileSize < 0) throw new IOException("Invalid download file size");
+
+        try (OutputStream fileOut = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW)) {
+            byte[] buffer = new byte[64 * 1024];
+            long remaining = fileSize;
+
+            while (remaining > 0) {
+                int bytesToRead = (int) Math.min(buffer.length, remaining);
+                int bytesRead = inputStream.read(buffer, 0, bytesToRead);
+
+                if (bytesRead == -1) throw new EOFException("Connection lost");
+
+                fileOut.write(buffer, 0, bytesRead);
+                remaining -= bytesRead;
+            }
+        }
     }
 
     private void shutdownClient() {

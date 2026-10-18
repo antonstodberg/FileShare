@@ -33,107 +33,18 @@ public class ClientHandler extends Thread {
 
     public Socket getSocket() { return socket; }
 
+    /** Reads commands until the client exits or an error ends the connection. */
     @Override
     public void run() {
         try {
-            String input;
+
             boolean running = true;
+
             while (running) {
-                input = inputStream.readUTF();
-                if (input.isBlank()) {
-                    sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
-                    continue;
-                }
-                String[] inputArray = input.trim().split("\\s+");
-                UserCommands command = UserCommands.fromCommand(inputArray[0]);
-                if (command == null) {
-                    sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
-                    continue;
-                }
-
-                switch (command) {
-                    case LOGIN:
-                        if (user != null) {
-                            sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
-                            break;
-                        }
-                        login(inputArray);
-                        break;
-
-                    case REGISTER:
-                        if (user != null) {
-                            sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
-                            break;
-                        }
-                        register(inputArray);
-                        break;
-
-                    case LIST:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-                        sendStringToClient(server.listFiles(user));
-                        break;
-
-                    case UPLOAD:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-
-                        uploadFile(input.trim().split("\\s+", 2));
-                        break;
-
-                    case DOWNLOAD:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-
-                        downloadFile(inputArray);
-                        break;
-
-                    case DELETE:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-                        delete(inputArray);
-                        break;
-
-                    case SHARE:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-                        share(inputArray);
-                        break;
-
-                    case UNSHARE:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-                        unshare(inputArray);
-                        break;
-
-                    case LOGOUT:
-                        if (user == null) {
-                            sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
-                            break;
-                        }
-
-                        user = null;
-                        sendStringToClient(ServerResponse.LOGOUT);
-                        break;
-
-                    case EXIT:
-                        sendStringToClient(ServerResponse.EXIT);
-                        running = false;
-                        break;
-                }
+                String input = inputStream.readUTF();
+                running = handleCommand(input);
             }
+
         } catch (IOException e) {
             System.err.println("Connection or transfer failed: " + e.getMessage());
 
@@ -152,6 +63,108 @@ public class ClientHandler extends Thread {
 
             server.removeClient(this);
         }
+    }
+
+    /**
+     * Handles one command.
+     *
+     * @return false if the client requests exit, otherwise true.
+     */
+    private boolean handleCommand(String input) throws IOException, SQLException {
+        if (input.isBlank()) {
+            sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+            return true;
+        }
+        String[] inputArray = input.trim().split("\\s+");
+        UserCommands command = UserCommands.fromCommand(inputArray[0]);
+        if (command == null) {
+            sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
+            return true;
+        }
+
+        switch (command) {
+            case LOGIN:
+                if (user != null) {
+                    sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                    break;
+                }
+                login(inputArray);
+                break;
+
+            case REGISTER:
+                if (user != null) {
+                    sendStringToClient(ServerResponse.ALREADY_LOGGED_IN);
+                    break;
+                }
+                register(inputArray);
+                break;
+
+            case LIST:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                sendStringToClient(server.listFiles(user));
+                break;
+
+            case UPLOAD:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                uploadFile(input.trim().split("\\s+", 2));
+                break;
+
+            case DOWNLOAD:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                downloadFile(inputArray);
+                break;
+
+            case DELETE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                delete(inputArray);
+                break;
+
+            case SHARE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                share(inputArray);
+                break;
+
+            case UNSHARE:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+                unshare(inputArray);
+                break;
+
+            case LOGOUT:
+                if (user == null) {
+                    sendStringToClient(ServerResponse.USER_NOT_LOGGED_IN);
+                    break;
+                }
+
+                user = null;
+                sendStringToClient(ServerResponse.LOGOUT);
+                break;
+
+            case EXIT:
+                sendStringToClient(ServerResponse.EXIT);
+                return false;
+        }
+
+        return true;
     }
 
     private void sendStringToClient(String s) throws IOException {
