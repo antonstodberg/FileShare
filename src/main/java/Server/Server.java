@@ -90,26 +90,14 @@ public class Server {
     public void start() {
         try {
             printServerStatus();
-            Thread shutdownThread = new Thread(() -> {
-                Scanner scanner = new Scanner(System.in);
-
-                while (scanner.hasNextLine()) {
-                    String command = scanner.nextLine();
-
-                    if (command.equalsIgnoreCase("exit")) {
-                        shutdown();
-                        break;
-                    }
-                }
-            });
-            shutdownThread.start();
-
+            startShutdownListener();
             while (true) {
                 SSLSocket clientSocket = (SSLSocket) socket.accept();
                 ClientHandler ch = new ClientHandler(clientSocket, this);
                 addClient(ch);
                 ch.start();
             }
+
         } catch (IOException e) {
             if (socket.isClosed()) {
                 System.out.println("Server stopped");
@@ -117,24 +105,44 @@ public class Server {
                 e.printStackTrace();
             }
         } finally {
-            List<ClientHandler> clientsToClose;
-
-            synchronized (this) {
-                clientsToClose = new ArrayList<>(clients);
-                clients.clear();
-            }
-
-            for (ClientHandler ch : clientsToClose) {
-                ch.interrupt();
-
-                try {
-                    ch.getSocket().close();
-                } catch (IOException ignored) {
-                }
-            }
+            closeAllClients();
 
             try {
                 socket.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private void startShutdownListener() {
+        Thread shutdownThread = new Thread(() -> {
+            Scanner scanner = new Scanner(System.in);
+
+            while (scanner.hasNextLine()) {
+                String command = scanner.nextLine();
+
+                if (command.equalsIgnoreCase("exit")) {
+                    shutdown();
+                    break;
+                }
+            }
+        });
+        shutdownThread.start();
+    }
+
+    private void closeAllClients() {
+        List<ClientHandler> clientsToClose;
+
+        synchronized (this) {
+            clientsToClose = new ArrayList<>(clients);
+            clients.clear();
+        }
+
+        for (ClientHandler ch : clientsToClose) {
+            ch.interrupt();
+
+            try {
+                ch.getSocket().close();
             } catch (IOException ignored) {
             }
         }
@@ -160,6 +168,20 @@ public class Server {
      */
     public User register(String username, String email, String password)
             throws SQLException {
+
+        validateRegistration(username, email, password);
+
+        String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
+        return database.register(username, email, passwordHash);
+    }
+
+    /**
+     * Checks registration details.
+     *
+     * @throws IllegalArgumentException if any registration detail is invalid.
+     */
+    private void validateRegistration(
+            String username, String email, String password) {
 
         if (!isValidArgument(username)
                 || username.codePointCount(0, username.length()) > 50) {
@@ -191,9 +213,6 @@ public class Server {
                     "Password must contain 1–72 UTF-8 bytes without whitespace."
             );
         }
-
-        String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
-        return database.register(username, email, passwordHash);
     }
 
     public User login(String username, String password) throws SQLException {
@@ -208,6 +227,13 @@ public class Server {
     public String listFiles(User user) throws SQLException {
         StringBuilder sb = new StringBuilder();
 
+        appendOwnedFiles(sb, user);
+        appendSharedFiles(sb, user);
+
+        return sb.toString();
+    }
+
+    private void appendOwnedFiles(StringBuilder sb, User user) throws SQLException {
         sb.append("Your files\n");
         sb.append(String.format("%-6s %-25s %-12s %-22s %-30s%n",
                 "ID", "NAME", "SIZE", "UPLOADED", "SHARED TO"));
@@ -241,7 +267,9 @@ public class Server {
                     file.getUploadedAt(),
                     sharedTo));
         }
+    }
 
+    private void appendSharedFiles(StringBuilder sb, User user) throws SQLException {
         sb.append("\nShared with you\n");
         sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
                 "ID", "NAME", "SIZE", "UPLOADED", "OWNER"));
@@ -260,18 +288,12 @@ public class Server {
                     file.getUploadedAt(),
                     database.getUser(file.getOwnerId()).getUsername()));
         }
-
-        return sb.toString();
     }
 
+    /** Returns the users with shared access after verifying file ownership. */
     public List<User> getUsersWithAccessToFile(int ownerId, long fileId) throws FileNotFoundException, IllegalAccessException, SQLException {
-        FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
 
-        if (file.getOwnerId() != ownerId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
-        }
-
+        requireOwnedFile(ownerId, fileId);
         return new ArrayList<User>(database.getUsersWithFileAccess(fileId));
     }
 
@@ -280,6 +302,23 @@ public class Server {
                            int ownerId,
                            InputStream inputStream) throws IOException, SQLException {
 
+        validateUpload(fileName, fileSize);
+
+        long fileId = database.addFile(fileName, fileSize, ownerId);
+
+        try {
+            FileStorage.save(fileId, inputStream, fileSize);
+            return true;
+
+        } catch (IOException e) {
+            database.deleteFile(fileId);
+            if (FileStorage.exists(fileId)) FileStorage.delete(fileId);
+            return false;
+        }
+    }
+
+    /** Validates the uploaded file's name and declared size. */
+    private void validateUpload(String fileName, long fileSize) throws IOException {
         if (fileName == null
                 || fileName.isBlank()
                 || fileName.codePointCount(0, fileName.length()) > 255
@@ -295,18 +334,6 @@ public class Server {
         if (fileSize < 0) {
             throw new IOException("File size must not be negative");
         }
-
-        long fileId = database.addFile(fileName, fileSize, ownerId);
-
-        try {
-            FileStorage.save(fileId, inputStream, fileSize);
-            return true;
-
-        } catch (IOException e) {
-            database.deleteFile(fileId);
-            if (FileStorage.exists(fileId)) FileStorage.delete(fileId);
-            return false;
-        }
     }
 
     public DownloadData downloadFile(int userId, long fileId) throws SQLException, IOException, IllegalAccessException {
@@ -320,18 +347,11 @@ public class Server {
         }
     }
 
+    /** Deletes an owned file from storage and the database. */
     public void deleteFile(int userId, long fileId)
             throws SQLException, IllegalAccessException, IOException {
 
-        FileRecord file = database.getFile(fileId);
-
-        if (file == null) {
-            throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
-        }
-
-        if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
-        }
+        requireOwnedFile(userId, fileId);
 
         if (!FileStorage.exists(fileId)) {
             database.deleteFile(fileId);
@@ -342,14 +362,9 @@ public class Server {
         database.deleteFile(fileId);
     }
 
+    /** Shares an owned file with another user. */
     public void shareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
-        FileRecord file = database.getFile(fileId);
-
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
-
-        if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
-        }
+        FileRecord file = requireOwnedFile(userId, fileId);
 
         User userToShare = database.getUser(username);
 
@@ -368,13 +383,9 @@ public class Server {
         database.shareFileToUser(fileId, userToShare.getId());
     }
 
+    /** Removes another user's shared access to an owned file. */
     public void unshareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
-        FileRecord file = database.getFile(fileId);
-        if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
-
-        if (file.getOwnerId() != userId) {
-            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
-        }
+        FileRecord file = requireOwnedFile(userId, fileId);
 
         User userToUnshare = database.getUser(username);
 
@@ -393,17 +404,6 @@ public class Server {
         database.removeSharedAccessToFile(fileId, userToUnshare.getId());
     }
 
-    static void main(String[] args) {
-        Server server;
-        if (args.length > 0) {
-            server = new Server(Integer.parseInt(args[0]));
-        } else {
-            server = new Server();
-        }
-
-        server.start();
-    }
-
     /**
      * Checks that a command argument is nonempty and contains no separators
      * or control characters.
@@ -415,5 +415,38 @@ public class Server {
                 Character.isWhitespace(c)
                         || Character.isSpaceChar(c)
                         || Character.isISOControl(c));
+    }
+
+    /**
+     * Retrieves a file and verifies ownership.
+     *
+     * @throws FileNotFoundException if the file does not exist.
+     * @throws IllegalAccessException if the user does not own the file.
+     */
+    private FileRecord requireOwnedFile(int userId, long fileId)
+            throws SQLException, FileNotFoundException, IllegalAccessException {
+
+        FileRecord file = database.getFile(fileId);
+
+        if (file == null) {
+            throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
+        }
+
+        if (file.getOwnerId() != userId) {
+            throw new IllegalAccessException(ServerResponse.USER_NOT_OWN_FILE);
+        }
+
+        return file;
+    }
+
+    static void main(String[] args) {
+        Server server;
+        if (args.length > 0) {
+            server = new Server(Integer.parseInt(args[0]));
+        } else {
+            server = new Server();
+        }
+
+        server.start();
     }
 }
