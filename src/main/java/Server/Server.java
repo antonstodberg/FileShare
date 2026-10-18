@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
+/** Accepts SSL clients and coordinates authentication, file storage and access control. */
 public class Server {
     private final static int DEFAULT_PORT = 2000;
     private SSLServerSocket socket;
@@ -24,7 +25,10 @@ public class Server {
 
     private volatile boolean shuttingDown = false;
 
+    /** Initializes the server using the default port. */
     public Server() { this(DEFAULT_PORT); }
+
+    /** Checks database connectivity and creates the SSL listening socket on the specified port. */
     public Server(int port) {
         database = new Database();
         try {
@@ -39,10 +43,12 @@ public class Server {
         }
     }
 
+    /** Returns the database component used by this server. */
     Database getDatabase() {
         return database;
     }
 
+    /** Prints the local host name, listening port and number of registered client handlers. */
     private void printServerStatus() {
         String host = null;
         try {
@@ -62,6 +68,7 @@ public class Server {
         );
     }
 
+    /** Formats a byte count using powers of 1024 and a suitable size label. */
     private String formatFileSize(long bytes) {
         if (bytes < 1024) {
             return bytes + " B";
@@ -79,6 +86,7 @@ public class Server {
         return String.format("%.2f %s", size, units[unitIndex]);
     }
 
+    /** Marks shutdown as requested and closes the listening socket to stop accepting clients. */
     public void shutdown() {
         shuttingDown = true;
         try {
@@ -87,6 +95,7 @@ public class Server {
         }
     }
 
+    /** Accepts clients and starts their handlers, then closes client connections when the loop ends. */
     public void start() {
         try {
             printServerStatus();
@@ -114,6 +123,7 @@ public class Server {
         }
     }
 
+    /** Starts a separate thread that listens for the server's exit command. */
     private void startShutdownListener() {
         Thread shutdownThread = new Thread(() -> {
             Scanner scanner = new Scanner(System.in);
@@ -130,6 +140,7 @@ public class Server {
         shutdownThread.start();
     }
 
+    /** Clears the client list, interrupts the handlers and attempts to close their sockets. */
     private void closeAllClients() {
         List<ClientHandler> clientsToClose;
 
@@ -148,11 +159,13 @@ public class Server {
         }
     }
 
+    /** Adds a client handler to the list and prints the server status. */
     public synchronized void addClient(ClientHandler ch) {
         clients.add(ch);
         printServerStatus();
     }
 
+    /** Closes and removes a client handler, printing status unless shutdown was requested. */
     public synchronized void removeClient(ClientHandler ch) {
         try { ch.getSocket().close(); } catch (IOException ignored) { }
 
@@ -164,7 +177,14 @@ public class Server {
     }
 
     /**
-     * Validates registration details, hashes the password and creates the user.
+     * Validates registration details, hashes the password and creates a user.
+     *
+     * @param username the requested username.
+     * @param email the user's email address.
+     * @param password the plaintext password to hash.
+     * @return the created user, or null if the database returns no generated ID.
+     * @throws IllegalArgumentException if registration details are invalid.
+     * @throws SQLException if the database operation fails.
      */
     public User register(String username, String email, String password)
             throws SQLException {
@@ -215,6 +235,14 @@ public class Server {
         }
     }
 
+    /**
+     * Authenticates a user against the stored password hash.
+     *
+     * @param username the username to look up.
+     * @param password the plaintext password to check.
+     * @return the user if authentication succeeds, otherwise null.
+     * @throws SQLException if the database lookup fails.
+     */
     public User login(String username, String password) throws SQLException {
         User stored_user = database.getUser(username);
         if (stored_user == null) return null;
@@ -224,6 +252,13 @@ public class Server {
         return null;
     }
 
+    /**
+     * Builds a textual listing of owned files and files shared with the user.
+     *
+     * @param user the user whose files should be listed.
+     * @return the formatted listing, including both table headings.
+     * @throws SQLException if a required database query fails.
+     */
     public String listFiles(User user) throws SQLException {
         StringBuilder sb = new StringBuilder();
 
@@ -233,6 +268,7 @@ public class Server {
         return sb.toString();
     }
 
+    /** Appends a table of the user's owned files and their sharing recipients. */
     private void appendOwnedFiles(StringBuilder sb, User user) throws SQLException {
         sb.append("Your files\n");
         sb.append(String.format("%-6s %-25s %-12s %-22s %-30s%n",
@@ -269,6 +305,7 @@ public class Server {
         }
     }
 
+    /** Appends a table of files shared with the user and their owners. */
     private void appendSharedFiles(StringBuilder sb, User user) throws SQLException {
         sb.append("\nShared with you\n");
         sb.append(String.format("%-6s %-25s %-12s %-22s %-20s%n",
@@ -290,13 +327,35 @@ public class Server {
         }
     }
 
-    /** Returns the users with shared access after verifying file ownership. */
+    /**
+     * Retrieves the sharing recipients of a file after verifying ownership.
+     *
+     * @param ownerId the ID of the user requesting the recipient list.
+     * @param fileId the ID of the file.
+     * @return the sharing recipients, or an empty list if the file is not shared.
+     * @throws FileNotFoundException if the file has no database record.
+     * @throws IllegalAccessException if the requesting user does not own the file.
+     * @throws SQLException if a database operation fails.
+     */
     public List<User> getUsersWithAccessToFile(int ownerId, long fileId) throws FileNotFoundException, IllegalAccessException, SQLException {
 
         requireOwnedFile(ownerId, fileId);
         return new ArrayList<User>(database.getUsersWithFileAccess(fileId));
     }
 
+    /**
+     * Validates upload metadata, creates a database record and stores the file.
+     * If saving fails, attempts to remove the database record and partial file.
+     * Does not close the supplied input stream.
+     *
+     * @param fileName the original file name.
+     * @param fileSize the declared number of bytes to receive.
+     * @param ownerId the ID of the file owner.
+     * @param inputStream the stream supplying the file contents.
+     * @return true if saving succeeds, or false if saving fails and cleanup completes.
+     * @throws IOException if metadata validation or file cleanup fails.
+     * @throws SQLException if record creation or database cleanup fails.
+     */
     public boolean uploadFile(String fileName,
                            long fileSize,
                            int ownerId,
@@ -317,7 +376,14 @@ public class Server {
         }
     }
 
-    /** Validates the uploaded file's name and declared size. */
+    /**
+     * Checks that the file name is nonblank, contains at most 255 code points
+     * and has no forbidden path or control characters, and that the size is nonnegative.
+     *
+     * @param fileName the proposed file name.
+     * @param fileSize the declared size in bytes.
+     * @throws IOException if either value is invalid.
+     */
     private void validateUpload(String fileName, long fileSize) throws IOException {
         if (fileName == null
                 || fileName.isBlank()
@@ -336,6 +402,17 @@ public class Server {
         }
     }
 
+    /**
+     * Opens a stored file after checking ownership or shared access.
+     *
+     * @param userId the ID of the user requesting the file.
+     * @param fileId the ID of the requested file.
+     * @return the file metadata and an open input stream that the caller must close.
+     * @throws FileNotFoundException if the database record or stored file is missing.
+     * @throws IllegalAccessException if the user has no access to the file.
+     * @throws IOException if the stored file cannot be opened.
+     * @throws SQLException if a database operation fails.
+     */
     public DownloadData downloadFile(int userId, long fileId) throws SQLException, IOException, IllegalAccessException {
         FileRecord file = database.getFile(fileId);
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
@@ -347,7 +424,18 @@ public class Server {
         }
     }
 
-    /** Deletes an owned file from storage and the database. */
+    /**
+     * Deletes a file owned by the requesting user.
+     * If the stored file is already missing, removes its database record
+     * and reports the missing file.
+     *
+     * @param userId the ID of the requesting user.
+     * @param fileId the ID of the file to delete.
+     * @throws FileNotFoundException if the database record or stored file is missing.
+     * @throws IllegalAccessException if the user does not own the file.
+     * @throws IOException if deleting the stored file fails.
+     * @throws SQLException if a database operation fails.
+     */
     public void deleteFile(int userId, long fileId)
             throws SQLException, IllegalAccessException, IOException {
 
@@ -362,7 +450,18 @@ public class Server {
         database.deleteFile(fileId);
     }
 
-    /** Shares an owned file with another user. */
+    /**
+     * Grants another user shared access to an owned file.
+     *
+     * @param userId the ID of the requesting owner.
+     * @param fileId the ID of the file to share.
+     * @param username the recipient's username.
+     * @throws FileNotFoundException if the file has no database record.
+     * @throws IllegalAccessException if the requesting user does not own the file.
+     * @throws IllegalArgumentException if the recipient is unknown, is the owner
+     *         or already has shared access.
+     * @throws SQLException if a database operation fails.
+     */
     public void shareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = requireOwnedFile(userId, fileId);
 
@@ -383,7 +482,18 @@ public class Server {
         database.shareFileToUser(fileId, userToShare.getId());
     }
 
-    /** Removes another user's shared access to an owned file. */
+    /**
+     * Removes another user's shared access to an owned file.
+     *
+     * @param userId the ID of the requesting owner.
+     * @param fileId the ID of the file.
+     * @param username the username whose shared access should be removed.
+     * @throws FileNotFoundException if the file has no database record.
+     * @throws IllegalAccessException if the requesting user does not own the file.
+     * @throws IllegalArgumentException if the target user is unknown, is the owner
+     *         or has no shared access.
+     * @throws SQLException if a database operation fails.
+     */
     public void unshareFile(int userId, long fileId, String username) throws SQLException, IllegalAccessException, FileNotFoundException {
         FileRecord file = requireOwnedFile(userId, fileId);
 
@@ -418,10 +528,15 @@ public class Server {
     }
 
     /**
-     * Retrieves a file and verifies ownership.
+     * Retrieves file metadata and verifies ownership.
+     * Does not check whether the physical file exists.
      *
-     * @throws FileNotFoundException if the file does not exist.
+     * @param userId the ID of the user whose ownership should be checked.
+     * @param fileId the ID of the file.
+     * @return the metadata of the owned file.
+     * @throws FileNotFoundException if the file has no database record.
      * @throws IllegalAccessException if the user does not own the file.
+     * @throws SQLException if the database lookup fails.
      */
     private FileRecord requireOwnedFile(int userId, long fileId)
             throws SQLException, FileNotFoundException, IllegalAccessException {
@@ -439,6 +554,7 @@ public class Server {
         return file;
     }
 
+    /** Starts the server using an optional port argument. */
     static void main(String[] args) {
         Server server;
         if (args.length > 0) {

@@ -1,5 +1,6 @@
 package Protocol;
 
+/** Defines the commands supported by the FileShare protocol. */
 public enum UserCommands {
     LOGIN("login"),
     REGISTER("register"),

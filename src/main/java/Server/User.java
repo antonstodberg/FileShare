@@ -1,5 +1,6 @@
 package Server;
 
+/** Stores a user's ID, username, email address and password hash. */
 public class User {
     private final int id;
     private final String username;

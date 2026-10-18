@@ -2,6 +2,7 @@ package Server;
 
 import java.time.LocalDateTime;
 
+/** Stores file metadata without holding the file contents. */
 public class FileRecord {
     private final long id;
     private final String fileName;

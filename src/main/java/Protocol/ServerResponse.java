@@ -1,5 +1,6 @@
 package Protocol;
 
+/** Defines response strings shared by the client and server. */
 public final class ServerResponse {
     // FOR USER
     // Login & Registration
