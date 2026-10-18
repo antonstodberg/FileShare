@@ -33,6 +33,7 @@ public class ClientHandler extends Thread {
 
     public Socket getSocket() { return socket; }
 
+    /** Reads commands until the client exits or an error ends the connection. */
     @Override
     public void run() {
         try {
@@ -163,16 +164,21 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /**
+     * Handles one command.
+     *
+     * @return false if the client requests exit, otherwise true.
+     */
     private boolean handleCommand(String input) throws IOException, SQLException {
         if (input.isBlank()) {
             sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
-            continue;
+            return true;
         }
         String[] inputArray = input.trim().split("\\s+");
         UserCommands command = UserCommands.fromCommand(inputArray[0]);
         if (command == null) {
             sendStringToClient(ServerResponse.UNRECOGNIZED_COMMAND);
-            continue;
+            return true;
         }
 
         switch (command) {
@@ -254,9 +260,10 @@ public class ClientHandler extends Thread {
 
             case EXIT:
                 sendStringToClient(ServerResponse.EXIT);
-                running = false;
-                break;
+                return false;
         }
+
+        return true;
     }
 
     private void sendStringToClient(String s) throws IOException {
