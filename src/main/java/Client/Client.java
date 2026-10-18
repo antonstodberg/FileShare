@@ -8,6 +8,7 @@ import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Scanner;
 
 public class Client {
@@ -15,18 +16,28 @@ public class Client {
     private final static int DEFAULT_PORT = 2000;
 
     private final static String C_WELCOME_MESSAGE = "\nFILESHARE\n"
-            + UserCommands.LOGIN.getCommand() + " <username> <password> -> log in to already registered user\n"
-            + UserCommands.REGISTER.getCommand() + " <username> <email> <password> -> register new user and log in";
+            + UserCommands.LOGIN.getCommand()
+            + " <username> <password> -> log in to already registered user\n"
+            + UserCommands.REGISTER.getCommand()
+            + " <username> <email> <password> -> register new user and log in";
 
     private final static String C_ENTER_COMMAND = "\nEnter command:\n"
-            + UserCommands.LIST.getCommand() + " -> list all files on server owned or shared with you\n"
-            + UserCommands.UPLOAD.getCommand() + " <filepath> -> upload a local file to the server\n"
-            + UserCommands.DOWNLOAD.getCommand() + " <fileId> -> download file from server to computer\n"
-            + UserCommands.DELETE.getCommand() + " <fileId> -> delete file from server\n"
-            + UserCommands.SHARE.getCommand() + " <fileId> <username> -> share file from your account to the specified user\n"
-            + UserCommands.UNSHARE.getCommand() + " <fileId> <username> -> remove that users access to file\n"
-            + UserCommands.LOGOUT.getCommand() + " -> log out current user\n"
-            + UserCommands.EXIT.getCommand() + " -> close program";
+            + UserCommands.LIST.getCommand()
+            + " -> list all files on server owned or shared with you\n"
+            + UserCommands.UPLOAD.getCommand()
+            + " <filepath> -> upload a local file to the server\n"
+            + UserCommands.DOWNLOAD.getCommand()
+            + " <fileId> -> download file from server to computer\n"
+            + UserCommands.DELETE.getCommand()
+            + " <fileId> -> delete file from server\n"
+            + UserCommands.SHARE.getCommand()
+            + " <fileId> <username> -> share file from your account to the specified user\n"
+            + UserCommands.UNSHARE.getCommand()
+            + " <fileId> <username> -> remove that users access to file\n"
+            + UserCommands.LOGOUT.getCommand()
+            + " -> log out current user\n"
+            + UserCommands.EXIT.getCommand()
+            + " -> close program";
 
     private final static String M_SERVER_LOST_CONNECTION = "Lost connection to server";
     private final static String M_FNF_OR_DOES_NOT_EXIST = "Path does not exist, or is not a valid file";
@@ -148,7 +159,7 @@ public class Client {
                 }
 
                 String response = switch (commandType) {
-                    case UPLOAD -> uploadFile(inputArray);
+                    case UPLOAD -> uploadFile(command.trim().split("\\s+", 2));
 
                     case DOWNLOAD -> downloadFile(inputArray);
 
@@ -185,12 +196,47 @@ public class Client {
 
         if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
-        Path path = Path.of(inputArray[1]);
+        String filePath = inputArray[1];
 
-        if (!Files.isRegularFile(path)) return M_FNF_OR_DOES_NOT_EXIST;
+        if (filePath.length() >= 2
+                && filePath.startsWith("\"")
+                && filePath.endsWith("\"")) {
+            filePath = filePath.substring(1, filePath.length() - 1);
+        }
+
+        if (filePath.isBlank()) {
+            return M_FNF_OR_DOES_NOT_EXIST;
+        }
+
+        Path path;
+
+        try {
+            path = Path.of(filePath);
+        } catch (java.nio.file.InvalidPathException e) {
+            return M_FNF_OR_DOES_NOT_EXIST;
+        }
+
+        if (!Files.isRegularFile(path)) {
+            return M_FNF_OR_DOES_NOT_EXIST;
+        }
 
         String filename = path.getFileName().toString();
         long fileSize = Files.size(path);
+
+        if (filename == null
+                || filename.isBlank()
+                || filename.equals(".")
+                || filename.equals("..")
+                || filename.contains("/")
+                || filename.contains("\\")
+                || filename.contains(":")
+                || filename.chars().anyMatch(Character::isISOControl)) {
+            throw new IOException("Invalid file name");
+        }
+
+        if (fileSize < 0) {
+            throw new IOException("Invalid file size");
+        }
 
         outputStream.writeUTF(UserCommands.UPLOAD.getCommand() + " " + filename + " " + fileSize);
 
@@ -232,19 +278,23 @@ public class Client {
         String name = dot > 0 ? originalFileName.substring(0, dot) : originalFileName;
         String extension = dot > 0 ? originalFileName.substring(dot) : "";
 
-        while (Files.exists(DOWNLOAD_PATH.resolve(fileName))) {
+        Path target = resolveDownloadPath(fileName);
+        while (Files.exists(target)) {
             ++c;
             fileName = name + "(" + c + ")" + extension;
+            target = resolveDownloadPath(fileName);
         }
 
         System.out.println("Downloading...");
 
-        try (OutputStream fileOut = new FileOutputStream(DOWNLOAD_PATH.resolve(fileName).toFile())) {
+
+
+        try (OutputStream fileOut = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW)) {
             byte[] buffer = new byte[64 * 1024];
             long remaining = fileSize;
 
             while (remaining > 0) {
-                int bytesToRead = Math.min(buffer.length, (int)remaining);
+                int bytesToRead = (int) Math.min(buffer.length, remaining);
                 int bytesRead = inputStream.read(buffer, 0, bytesToRead);
                 if (bytesRead == -1) throw new EOFException("Connection lost");
 
@@ -257,6 +307,28 @@ public class Client {
         } catch (FileNotFoundException e) {
             return M_FNF_OR_DOES_NOT_EXIST;
         }
+    }
+
+    private Path resolveDownloadPath(String fileName) throws IOException {
+        if (fileName == null
+                || fileName.isBlank()
+                || fileName.equals(".")
+                || fileName.equals("..")
+                || fileName.contains("/")
+                || fileName.contains("\\")
+                || fileName.contains(":")
+                || fileName.chars().anyMatch(Character::isISOControl)) {
+            throw new IOException("Invalid download file name");
+        }
+
+        Path directory = DOWNLOAD_PATH.toAbsolutePath().normalize();
+        Path target = directory.resolve(fileName).normalize();
+
+        if (!target.startsWith(directory)) {
+            throw new IOException("Download path is outside Downloads");
+        }
+
+        return target;
     }
 
     private void shutdownClient() {

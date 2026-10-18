@@ -12,7 +12,6 @@ public class ClientHandler extends Thread {
     public static final String INTERNAL_ARGUMENT_MISMATCH =
             "Arguments or params not correct with internal method implementation";
 
-    // could implement Runnable?
     private final Server server;
     private Socket socket;
     private DataOutputStream outputStream;
@@ -83,7 +82,7 @@ public class ClientHandler extends Thread {
                             break;
                         }
 
-                        uploadFile(inputArray);
+                        uploadFile(input.trim().split("\\s+", 2));
                         break;
 
                     case DOWNLOAD:
@@ -135,13 +134,15 @@ public class ClientHandler extends Thread {
                         break;
                 }
             }
-        } catch (IOException | SQLException e) {
-            if (e.getMessage() != null) {
-                System.err.println(e.getMessage());
-                try {
-                    sendStringToClient(e.getMessage());
-                } catch (IOException ignored) {
-                }
+        } catch (IOException e) {
+            System.err.println("Connection or transfer failed: " + e.getMessage());
+
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+
+            try {
+                sendStringToClient(ServerResponse.GENERAL_INTERNAL_ERROR);
+            } catch (IOException ignored) {
             }
         } finally {
             try {
@@ -171,41 +172,75 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void register(String[] inputArray) throws SQLException, IOException {
+    /**
+     * Registers and logs in a user, or returns an error without disconnecting.
+     */
+    private void register(String[] inputArray) throws IOException {
         if (inputArray.length != 4) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
             return;
         }
-        user = server.register(inputArray[1], inputArray[2], inputArray[3]);
 
-        if (user == null) {
-            sendStringToClient(ServerResponse.REGISTER_FAILED);
-        } else {
+        try {
+            User registeredUser = server.register(inputArray[1], inputArray[2], inputArray[3]);
+
+            if (registeredUser == null) {
+                sendStringToClient(ServerResponse.REGISTER_FAILED);
+                return;
+            }
+
+            user = registeredUser;
             sendStringToClient(ServerResponse.REGISTER_SUCCESS);
+
+        } catch (IllegalArgumentException e) {
+            sendStringToClient(e.getMessage());
+
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1062) {
+                sendStringToClient(ServerResponse.USERNAME_OR_EMAIL_TAKEN);
+            } else {
+                System.err.println("Registration failed: " + e.getMessage());
+                sendStringToClient(ServerResponse.REGISTER_FAILED_DB_ERROR);
+            }
         }
     }
 
+    /**
+     * Parses the file name and size and receives the upload.
+     * Aborts the connection if the upload cannot be completed.
+     */
     private void uploadFile(String[] inputArray) throws IOException {
-        if (inputArray.length != 3) {
-            System.err.println(INTERNAL_ARGUMENT_MISMATCH);
-            sendStringToClient(ServerResponse.UPLOAD_FAILED);
-            return;
+        if (inputArray.length != 2) {
+            throw new IOException("Invalid upload arguments");
         }
 
+        String arguments = inputArray[1];
+        int separator = arguments.lastIndexOf(' ');
+
+        if (separator <= 0 || separator == arguments.length() - 1) {
+            throw new IOException("Expected file name and file size");
+        }
+
+        String fileName = arguments.substring(0, separator);
+        String sizeText = arguments.substring(separator + 1);
+
         try {
-            String fileName = inputArray[1];
-            long fileSize = Long.parseLong(inputArray[2]);
+            long fileSize = Long.parseLong(sizeText);
 
-            boolean success = server.uploadFile(fileName, fileSize, user.getId(), inputStream);
+            boolean success = server.uploadFile(
+                    fileName, fileSize, user.getId(), inputStream
+            );
 
-            sendStringToClient(success ? ServerResponse.UPLOAD_SUCCESS : ServerResponse.UPLOAD_FAILED);
+            if (!success) {
+                throw new IOException("Upload could not be completed");
+            }
+
+            sendStringToClient(ServerResponse.UPLOAD_SUCCESS);
 
         } catch (NumberFormatException e) {
-            System.err.println(INTERNAL_ARGUMENT_MISMATCH + "\n ClientHandler.uploadFile(String[] inputArray) inputArray[2] -> expected long fileSize but received something else");
-            sendStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
+            throw new IOException("Invalid upload file size", e);
         } catch (SQLException e) {
-            System.err.println(e.getMessage());
-            sendStringToClient(ServerResponse.UPLOAD_FAILED_INTERNAL_ERROR);
+            throw new IOException("Database error during upload", e);
         }
     }
 
@@ -228,7 +263,7 @@ public class ClientHandler extends Thread {
                 outputStream.flush();
 
                 while (remaining > 0) {
-                    int bytesToRead = (int) Math.min(remaining, buffer.length);
+                    int bytesToRead = (int)Math.min(remaining, buffer.length);
                     int bytesRead = dataInputStream.read(buffer, 0, bytesToRead);
 
                     if (bytesRead == -1) {

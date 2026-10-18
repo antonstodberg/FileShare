@@ -10,6 +10,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -154,7 +155,43 @@ public class Server {
         }
     }
 
-    public User register(String username, String email, String password) throws SQLException {
+    /**
+     * Validates registration details, hashes the password and creates the user.
+     */
+    public User register(String username, String email, String password)
+            throws SQLException {
+
+        if (!isValidArgument(username)
+                || username.codePointCount(0, username.length()) > 50) {
+            throw new IllegalArgumentException(
+                    "Username must contain 1–50 characters without whitespace."
+            );
+        }
+
+        if (!isValidArgument(email)
+                || email.codePointCount(0, email.length()) > 255) {
+            throw new IllegalArgumentException(
+                    "Email must contain 1–255 characters without whitespace."
+            );
+        }
+
+        int at = email.indexOf('@');
+
+        if (at <= 0
+                || at != email.lastIndexOf('@')
+                || at == email.length() - 1) {
+            throw new IllegalArgumentException(
+                    "Email must have the format name@domain."
+            );
+        }
+
+        if (!isValidArgument(password)
+                || password.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalArgumentException(
+                    "Password must contain 1–72 UTF-8 bytes without whitespace."
+            );
+        }
+
         String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
         return database.register(username, email, passwordHash);
     }
@@ -242,6 +279,22 @@ public class Server {
                            long fileSize,
                            int ownerId,
                            InputStream inputStream) throws IOException, SQLException {
+
+        if (fileName == null
+                || fileName.isBlank()
+                || fileName.codePointCount(0, fileName.length()) > 255
+                || fileName.equals(".")
+                || fileName.equals("..")
+                || fileName.contains("/")
+                || fileName.contains("\\")
+                || fileName.contains(":")
+                || fileName.codePoints().anyMatch(Character::isISOControl)) {
+            throw new IOException("Invalid file name");
+        }
+
+        if (fileSize < 0) {
+            throw new IOException("File size must not be negative");
+        }
 
         long fileId = database.addFile(fileName, fileSize, ownerId);
 
@@ -349,5 +402,18 @@ public class Server {
         }
 
         server.start();
+    }
+
+    /**
+     * Checks that a command argument is nonempty and contains no separators
+     * or control characters.
+     */
+    private boolean isValidArgument(String value) {
+        return value != null
+                && !value.isEmpty()
+                && value.codePoints().noneMatch(c ->
+                Character.isWhitespace(c)
+                        || Character.isSpaceChar(c)
+                        || Character.isISOControl(c));
     }
 }

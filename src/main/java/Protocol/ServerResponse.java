@@ -7,6 +7,8 @@ public final class ServerResponse {
     public static final String LOGIN_FAILED = "Incorrect username or password.";
     public static final String REGISTER_SUCCESS = "Registration successful.";
     public static final String REGISTER_FAILED = "Registration failed.";
+    public static final String REGISTER_FAILED_DB_ERROR = "Registration failed due to a database error. Try again.";
+    public static final String USERNAME_OR_EMAIL_TAKEN = "Username or email is already registered.";
     public static final String LOGOUT = "User logged out.";
 
     // Command & Argument mismatch
