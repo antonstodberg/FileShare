@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Scanner;
 
+/** Commandline client for authentication and file operations over SSL */
 public class Client {
     private final static String DEFAULT_HOST = "127.0.0.1";
     private final static int DEFAULT_PORT = 2000;
@@ -65,14 +66,17 @@ public class Client {
         }
     }
 
+    /** Connects to the default host on the default port. */
     public Client() {
         this(DEFAULT_HOST, DEFAULT_PORT);
     }
 
+    /** Connects to the specified host on the default port. */
     public Client(String host) {
         this(host, DEFAULT_PORT);
     }
 
+    /** Creates an SSL socket and its data streams; exits if connection setup fails. */
     public Client(String host, int port) {
         try {
             socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket(host, port);
@@ -84,6 +88,7 @@ public class Client {
         }
     }
 
+    /** Prints the connected socket's remote host and port. */
     private void printConnectionInfo() {
         System.out.println(
                         "\n*****************************\n"
@@ -94,6 +99,13 @@ public class Client {
         );
     }
 
+    /**
+     * Reads a response encoded with DataOutputStream.writeUTF.
+     * Terminates the client if the input stream reaches its end, i.e disconnection.
+     *
+     * @return the response received from the server.
+     * @throws IOException if reading fails for a reason other than end of stream.
+     */
     private String readResponse() throws IOException {
         try {
             return inputStream.readUTF();
@@ -104,6 +116,7 @@ public class Client {
         return null;
     }
 
+    /** Processes commands until login or registration succeeds, or the client exits. */
     private void loginLoop() {
         while (true) {
             System.out.println(C_WELCOME_MESSAGE);
@@ -141,6 +154,7 @@ public class Client {
         }
     }
 
+    /** Processes commands for the current session until logout or client termination. */
     private void commandLoop() {
         while (true) {
             try {
@@ -194,7 +208,13 @@ public class Client {
         }
     }
 
-    /** Validates the local file, sends it to the server and returns the response. */
+    /**
+     * Validates a local file and uploads it to the server.
+     *
+     * @param inputArray the upload command and its complete path argument.
+     * @return a local validation error or the server's response.
+     * @throws IOException if reading the file or communicating with the server fails.
+     */
     private String uploadFile(String[] inputArray) throws IOException {
 
         if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
@@ -223,7 +243,13 @@ public class Client {
         return readResponse();
     }
 
-    /** Parses a possible path; returns the Path if it identifies a regular file, otherwise NULL. */
+    /**
+     * Parses a path, removing surrounding double quotes if present.
+     *
+     * @param filePath the path entered by the user.
+     * @return a path to an existing regular file, or null if the path is blank,
+     *         invalid or does not identify a regular file.
+     */
     private Path parseUploadPath(String filePath) {
         if (filePath.length() >= 2
             && filePath.startsWith("\"")
@@ -246,7 +272,13 @@ public class Client {
         return path;
     }
 
-    /** Sends the file contents without closing the connection's output stream. */
+    /**
+     * Sends a local file's contents and flushes the connection's output stream.
+     * Closes the file input stream but leaves the connection open.
+     *
+     * @param filePath the local file to send.
+     * @throws IOException if the file cannot be read or its contents cannot be sent.
+     */
     private void sendFileContent(Path filePath) throws IOException {
         try (InputStream fileIn = Files.newInputStream(filePath)) {
             byte[] buffer = new byte[64 * 1024];
@@ -260,7 +292,14 @@ public class Client {
         }
     }
 
-    /** Requests a file, receives it and returns the server error or success message. */
+    /**
+     * Requests a file and saves a successful download under an available local name.
+     * Saves files to FileShare/Downloads.
+     *
+     * @param inputArray the download command and the requested file ID.
+     * @return an argument error, a server error response or a download success message.
+     * @throws IOException if communication, path validation or local file writing fails.
+     */
     private String downloadFile(String[] inputArray) throws IOException {
         if (inputArray.length != 2) return M_ARGUMENT_MISMATCH;
 
@@ -280,7 +319,14 @@ public class Client {
         return M_DOWNLOAD_SUCCESS;
     }
 
-    /** Finds an unused download path by adding a numeric suffix when necessary. */
+    /**
+     * Finds a currently unused download path, adding a numeric suffix if needed.
+     * The returned path is not reserved; file creation may still fail.
+     *
+     * @param fileName the file name supplied by the server.
+     * @return an available path inside the download directory.
+     * @throws IOException if file name validation fails.
+     */
     private Path findAvailableDownloadPath(String fileName) throws IOException {
         Path target = resolveDownloadPath(fileName);
 
@@ -298,6 +344,14 @@ public class Client {
         return target;
     }
 
+    /**
+     * Validates a file name and resolves it inside the download directory.
+     *
+     * @param fileName a file name without directory components.
+     * @return the absolute, normalized download path.
+     * @throws IOException if the name is rejected or the resolved path is outside
+     *         the download directory.
+     */
     private Path resolveDownloadPath(String fileName) throws IOException {
         if (fileName == null
                 || fileName.isBlank()
@@ -320,7 +374,16 @@ public class Client {
         return target;
     }
 
-    /** Receives exactly fileSize bytes into a new file; throws if reception fails. */
+    /**
+     * Receives the declared number of bytes into a newly created file.
+     * Leaves the connection's input stream open.
+     * A partially written file may remain if reception fails.
+     *
+     * @param target the destination path, which must not already exist.
+     * @param fileSize the number of bytes to receive.
+     * @throws IOException if the size is negative, the destination cannot be written,
+     *         or the connection ends before all bytes are received.
+     */
     private void receiveFileContent(Path target, long fileSize) throws IOException {
         if (fileSize < 0) throw new IOException("Invalid download file size");
 
@@ -340,6 +403,7 @@ public class Client {
         }
     }
 
+    /** Closes input and connection resources and terminates the process with exit code 1. */
     private void shutdownClient() {
         scanner.close();
         try {
@@ -353,6 +417,7 @@ public class Client {
         }
     }
 
+    /** Starts the client with optional host and port arguments and handles program flow. */
     static void main(String[] args) {
         Client client = switch (args.length) {
             case 2 -> new Client(args[0], Integer.parseInt(args[1]));

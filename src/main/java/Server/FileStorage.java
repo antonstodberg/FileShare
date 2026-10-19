@@ -3,7 +3,6 @@ package Server;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 
 /**
@@ -22,12 +21,14 @@ public class FileStorage {
     }
 
     /**
-     * Saves file data using the file ID as the filename.
+     * Writes the declared number of bytes to storage using the file ID as its name.
+     * Replaces existing contents at that path and leaves the input stream open.
+     * A partial file may remain if saving fails.
      *
-     * @param fileId the ID of the file.
-     * @param inputStream the file data to save.
-     * @param fileSize size of data in bytes
-     * @throws IOException if the file could not be saved.
+     * @param fileId the ID used as the storage file name.
+     * @param inputStream the stream supplying the file contents.
+     * @param fileSize the nonnegative number of bytes to read.
+     * @throws IOException if writing fails or the input ends before all bytes are read.
      */
     public static void save(long fileId, InputStream inputStream, long fileSize) throws IOException {
         Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));
@@ -52,11 +53,11 @@ public class FileStorage {
     }
 
     /**
-     *  Reads file data from storage using the file ID.
+     * Opens an input stream for a stored file.
      *
-     *  @param fileId the ID of the file to read.
-     *  @return the stored file data.
-     *  @throws IOException if the file could not be read.
+     * @param fileId the ID used as the storage file name.
+     * @return an input stream that the caller must close.
+     * @throws IOException if the stored file cannot be opened.
      */
     public static InputStream read(long fileId) throws IOException {
         Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));
@@ -68,7 +69,7 @@ public class FileStorage {
      *  Deletes a stored file using its file ID.
      *
      *  @param fileId the ID of the file to delete.
-     *  @throws IOException if the file could not be deleted.
+     *  @throws IOException if the file is missing or cannot be deleted.
      */
     public static void delete(long fileId) throws IOException {
         Path filePath = STORAGE_PATH.resolve(String.valueOf(fileId));

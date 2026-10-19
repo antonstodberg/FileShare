@@ -4,12 +4,19 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Provides JDBC operations for users, file data and shares/permissions */
 public class Database {
     private static final String URL =
             "jdbc:mysql://localhost:3306/fileshare?sslMode=DISABLED&allowPublicKeyRetrieval=true";
     private static final String USER = "fileshare_admin";
     private static final String PASSWORD = "581039";
 
+    /**
+     * Checks that the configured database can be reached.
+     * The connection used for this check is closed before construction completes.
+     *
+     * @throws RuntimeException if the connection check fails.
+     */
     public Database() {
         try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
             System.out.println("Connected to database.");
@@ -103,7 +110,7 @@ public class Database {
 
 
     /**
-     * Adds a file to the database.
+     * Inserts file metadata into the database without storing file contents.
      *
      * @param fileName the name of the file.
      * @param size the size of the file in bytes.
@@ -133,7 +140,7 @@ public class Database {
     }
 
     /**
-     * Deletes a file from the database.
+     * Deletes a file's database record without deleting its stored contents.
      *
      * @param fileId the ID of the file to delete.
      * @throws SQLException if the deletion fails.
@@ -210,11 +217,11 @@ public class Database {
     }
 
     /**
-     * Retrieves all users who have shared access to a specified file.
+     * Retrieves the users listed as sharing recipients for a file.
      *
-     * @param fileId the ID of the file
-     * @return a list of users who have access to the file
-     * @throws SQLException if a database access error occurs
+     * @param fileId the ID of the file.
+     * @return the sharing recipients, or an empty list if no sharing entries exist.
+     * @throws SQLException if a database query fails.
      */
     public List<User> getUsersWithFileAccess(long fileId) throws SQLException {
         String sql = "SELECT user_id FROM file_shares WHERE file_id = ?";
@@ -264,11 +271,11 @@ public class Database {
     }
 
     /**
-     * Shares a file with a user.
+     * Inserts a sharing permission for a file and user.
      *
      * @param fileId the ID of the file to share.
      * @param userId the ID of the user receiving access.
-     * @throws SQLException if query failed.
+     * @throws SQLException if inserting the sharing permission fails.
      */
     public void shareFileToUser(long fileId, int userId) throws SQLException {
         String sql = "INSERT INTO file_shares (file_id, user_id) VALUES(?, ?)";

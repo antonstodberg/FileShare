@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import Protocol.UserCommands;
 import Protocol.ServerResponse;
 
+/** Handles commands and file transfers for one client connection and tracks its logged-in user. */
 public class ClientHandler extends Thread {
 
     public static final String INTERNAL_ARGUMENT_MISMATCH =
@@ -19,6 +20,7 @@ public class ClientHandler extends Thread {
 
     private User user;
 
+    /** Associates the client socket with the server and initializes its data streams. */
     public ClientHandler(Socket socket, Server server) {
         this.socket = socket;
         this.server = server;
@@ -31,6 +33,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /** Returns the socket used by this client handler. */
     public Socket getSocket() { return socket; }
 
     /** Reads commands until the client exits or an error ends the connection. */
@@ -66,9 +69,12 @@ public class ClientHandler extends Thread {
     }
 
     /**
-     * Handles one command.
+     * Parses one command, checks the session state and invokes its handler.
      *
+     * @param input the command received from the client.
      * @return false if the client requests exit, otherwise true.
+     * @throws IOException if communication or an upload operation fails.
+     * @throws SQLException if an unhandled database operation fails.
      */
     private boolean handleCommand(String input) throws IOException, SQLException {
         if (input.isBlank()) {
@@ -167,11 +173,13 @@ public class ClientHandler extends Thread {
         return true;
     }
 
+    /** Writes a response using writeUTF and flushes the output stream. */
     private void sendStringToClient(String s) throws IOException {
         outputStream.writeUTF(s);
         outputStream.flush();
     }
 
+    /** Checks login arguments, attempts authentication and sends the result to the client. */
     private void login(String[] inputArray) throws SQLException, IOException {
         if (inputArray.length != 3) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
@@ -186,7 +194,11 @@ public class ClientHandler extends Thread {
     }
 
     /**
-     * Registers and logs in a user, or returns an error without disconnecting.
+     * Registers a user and authenticates the current session on success.
+     * Sends validation and database errors without ending the command loop.
+     *
+     * @param inputArray the command, username, email address and password.
+     * @throws IOException if the response cannot be sent.
      */
     private void register(String[] inputArray) throws IOException {
         if (inputArray.length != 4) {
@@ -219,8 +231,12 @@ public class ClientHandler extends Thread {
     }
 
     /**
-     * Parses the file name and size and receives the upload.
-     * Aborts the connection if the upload cannot be completed.
+     * Parses upload metadata, receives the file and sends a success response.
+     * Throws an IOException on failure so that run() closes the connection.
+     *
+     * @param inputArray the command and the combined file name and size argument.
+     * @throws IOException if the arguments are invalid, storage fails,
+     *         a database operation fails or communication fails.
      */
     private void uploadFile(String[] inputArray) throws IOException {
         if (inputArray.length != 2) {
@@ -257,6 +273,14 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /**
+     * Requests an authorized download and sends its metadata and file contents.
+     * Sends error responses for invalid IDs, missing files and denied access.
+     *
+     * @param inputArray the download command and the requested file ID.
+     * @throws IOException if an unhandled file read or communication error occurs.
+     * @throws SQLException if a database operation fails.
+     */
     private void downloadFile(String[] inputArray) throws IOException, SQLException {
         if (inputArray.length != 2) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
@@ -296,6 +320,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /** Parses a file ID, requests deletion and sends a success or handled error response. */
     private void delete(String[] inputArray) throws SQLException, IOException {
         if (inputArray.length != 2) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
@@ -315,6 +340,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /** Parses a sharing request and sends the result of granting another user access. */
     private void share(String[] inputArray) throws IOException, SQLException {
         if (inputArray.length != 3) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);
@@ -332,6 +358,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    /** Parses an unsharing request and sends the result of removing another user's access. */
     private void unshare(String[] inputArray) throws IOException, SQLException {
         if (inputArray.length != 3) {
             sendStringToClient(ServerResponse.ARGUMENT_MISMATCH);

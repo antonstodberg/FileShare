@@ -3,6 +3,7 @@ package Server;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 
+/** Associates file metadata with an open input stream for a download. */
 public class DownloadData {
     private final InputStream inputStream;
     private final FileRecord fileRecord;
