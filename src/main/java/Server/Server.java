@@ -203,15 +203,13 @@ public class Server {
     private void validateRegistration(
             String username, String email, String password) {
 
-        if (!isValidArgument(username)
-                || username.codePointCount(0, username.length()) > 50) {
+        if (!isValidArgument(username) || username.length() > 50) {
             throw new IllegalArgumentException(
                     "Username must contain 1–50 characters without whitespace."
             );
         }
 
-        if (!isValidArgument(email)
-                || email.codePointCount(0, email.length()) > 255) {
+        if (!isValidArgument(email) || email.length() > 255) {
             throw new IllegalArgumentException(
                     "Email must contain 1–255 characters without whitespace."
             );
@@ -227,6 +225,7 @@ public class Server {
             );
         }
 
+        // BCrypt accepts at most 72 bytes after UTF-8 encoding.
         if (!isValidArgument(password)
                 || password.getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new IllegalArgumentException(
