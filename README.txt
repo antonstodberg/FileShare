@@ -27,7 +27,7 @@ Följande filer ska finnas i FileShare-mappen:
 - pom.xml
 - setup.sql
 - keystore
-- truststore
+- truststorer
 - src/ med projektets källkod
 
 Alla kommandon nedan körs från FileShare-mappen.
