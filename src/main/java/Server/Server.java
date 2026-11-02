@@ -417,7 +417,7 @@ public class Server {
         if (file == null) throw new FileNotFoundException(ServerResponse.FILE_DOES_NOT_EXIST);
 
         if (database.hasAccess(userId, fileId)) {
-            return new DownloadData(FileStorage.read(fileId), database.getFile(fileId));
+            return new DownloadData(FileStorage.read(fileId), file);
         } else {
             throw new IllegalAccessException(ServerResponse.USER_NOT_ACCESS_TO_FILE);
         }
